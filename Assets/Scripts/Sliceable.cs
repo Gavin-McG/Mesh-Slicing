@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class Sliceable : MonoBehaviour
@@ -8,7 +9,7 @@ public class Sliceable : MonoBehaviour
     [SerializeField] MeshFilter meshFilter;
     [SerializeField] MeshFilter emptyPrefab;
 
-    private void Start()
+    private void Awake()
     {
         meshFilter = GetComponent<MeshFilter>();
 
@@ -87,6 +88,8 @@ public class Sliceable : MonoBehaviour
         List<Vector2> newUVs = new List<Vector2>();
         List<int> newTriangles = new List<int>();
 
+        List<(int,int)> cutEdges = new List<(int, int)>();
+
         //get mesh data
         Vector3[] vertices = original.vertices;
         Vector3[] normals = original.normals;
@@ -104,6 +107,12 @@ public class Sliceable : MonoBehaviour
                 newNormals.Add(normals[i]);
                 newUVs.Add(UVs[i]);
             }
+        }
+
+        //check for empty mesh
+        if (newVertices.Count == 0 || newVertices.Count == vertices.Length)
+        {
+            return null;
         }
 
         //create new traingles from old triangles
@@ -197,6 +206,8 @@ public class Sliceable : MonoBehaviour
 
                     //add triangle to slice
                     newTriangles.AddRange(new int[] { vectorDict[v1], newVertices.Count, newVertices.Count + 1});
+                    //add new edge to list
+                    cutEdges.Add((newVertices.Count, newVertices.Count + 1));
                     //new point 1
                     newVertices.Add(newPoint1);
                     newNormals.Add(newNormal1);
@@ -221,6 +232,8 @@ public class Sliceable : MonoBehaviour
                     //add trapezoid to slice
                     newTriangles.AddRange(new int[] { newVertices.Count, vectorDict[v2], vectorDict[v3] });
                     newTriangles.AddRange(new int[] { newVertices.Count, vectorDict[v3], newVertices.Count + 1 });
+                    //add new edge to list
+                    cutEdges.Add((newVertices.Count + 1, newVertices.Count));
                     //new point 1
                     newVertices.Add(newPoint1);
                     newNormals.Add(newNormal1);
@@ -237,20 +250,55 @@ public class Sliceable : MonoBehaviour
             }
         }
 
-        //create new mesh
-        if (newTriangles.Count != 0)
+
+
+        //TODO - make better algorithm for complex shapes
+        //find center point of new points on edge
+        if (cutEdges.Count > 0)
         {
-            Mesh slice = new Mesh();
-            slice.SetVertices(newVertices);
-            slice.SetNormals(newNormals);
-            slice.SetUVs(0, newUVs);
-            slice.SetTriangles(newTriangles, 0);
-            slice.RecalculateBounds();
+            Vector3 centerPoint = Vector3.zero;
+            for (int i = 0; i < cutEdges.Count; ++i)
+            {
+                centerPoint += newVertices[cutEdges[i].Item1] + newVertices[cutEdges[i].Item2];
+            }
+            centerPoint /= cutEdges.Count * 2;
+            if (centerPoint.magnitude > 0.05)
+            {
+                Debug.LogWarning("Big centerpoint");
+            }
 
-            return slice;
+            int centerPointIndex = newVertices.Count;
+            newVertices.Add(centerPoint);
+            newNormals.Add(-planeNormal);
+            newUVs.Add(Vector2.zero);
+
+            //add new geometry into plane
+            for (int i = 0; i < cutEdges.Count; ++i)
+            {
+                //new traingle
+                newTriangles.AddRange(new int[] { newVertices.Count + 1, newVertices.Count, centerPointIndex });
+
+                //new points
+                newVertices.Add(newVertices[cutEdges[i].Item1]);
+                newNormals.Add(-planeNormal);
+                newUVs.Add(Vector2.zero);
+
+                newVertices.Add(newVertices[cutEdges[i].Item2]);
+                newNormals.Add(-planeNormal);
+                newUVs.Add(Vector2.zero);
+            }
         }
+        
 
-        return null;
+        //create new mesh
+        Mesh slice = new Mesh();
+        slice.SetVertices(newVertices);
+        slice.SetNormals(newNormals);
+        slice.SetUVs(0, newUVs);
+        slice.SetTriangles(newTriangles, 0);
+        slice.RecalculateBounds();
+
+        return slice;
     }
 
 
@@ -258,6 +306,7 @@ public class Sliceable : MonoBehaviour
     {
         //create new GameObject
         MeshFilter newFilter = Instantiate(prefabFilter);
+        newFilter.name = gameObject.name;
 
         //set GameObject values
         newFilter.mesh = mesh;
@@ -307,10 +356,10 @@ public class Sliceable : MonoBehaviour
 
         //get new slices
         Mesh slice1 = GetMeshSlice(original, planePoint, planeNormal);
-        Mesh slice2 = GetMeshSlice(original, planePoint, -planeNormal);
+        Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
 
         //check that object is split
-        if (slice1 != null && slice2 != null)
+        if (slice2 != null)
         {
             //assign new slices to GameObjects
             CreateNewPeice(emptyPrefab, slice1);
@@ -318,6 +367,7 @@ public class Sliceable : MonoBehaviour
 
             //destroy original object
             Destroy(gameObject);
+            Slicer.MakeSlice.RemoveListener(Slice);
         }
     }
 }
