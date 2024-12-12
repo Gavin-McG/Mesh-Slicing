@@ -63,6 +63,8 @@ public class Sliceable : MonoBehaviour
         float dotProduct = Vector3.Dot(planeNormal, lineDir);
         float t = Vector3.Dot(planePoint - point1, planeNormal) / dotProduct;
 
+        t = Math.Clamp(t, 0.0f, 1.0f);
+
         return t;
     }
 

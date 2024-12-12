@@ -319,22 +319,22 @@ PrefabInstance:
     - target: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -2222346464153789849, guid: f5c1b4dc1c4775141a94aa417f0ba6dc, type: 3}
+      objectReference: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     - target: {fileID: 2108902002336450795, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
       objectReference: {fileID: 2100000, guid: 3bbda6b41551d0545925867a9ca11dab, type: 2}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalScale.x
-      value: 100
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalScale.y
-      value: 100
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalScale.z
-      value: 100
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalPosition.x
@@ -379,7 +379,7 @@ PrefabInstance:
     - target: {fileID: 7182193146598005623, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -2222346464153789849, guid: f5c1b4dc1c4775141a94aa417f0ba6dc, type: 3}
+      objectReference: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     - target: {fileID: 7934931669055476929, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Name
       value: Empty
@@ -428,7 +428,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1299085335}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -504,7 +504,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!64 &1491492281
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -586,7 +586,7 @@ Transform:
   m_GameObject: {fileID: 1491492280}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.24, z: 0}
+  m_LocalPosition: {x: 0, y: -1.4, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
