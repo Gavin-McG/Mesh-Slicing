@@ -13,13 +13,7 @@ public class Slicer : MonoBehaviour
     {
         if (makeSlice)
         {
-            //MakeSlice.Invoke(transform.position, transform.up);
-            for (int i = 0; i < 20; ++i)
-            {
-                Vector3 pos = transform.position + new Vector3(Random.Range(-2, 2), Random.Range(-2, 2), Random.Range(-2, 2));
-                Vector3 dir = new Vector3(Random.Range(-2, 2), Random.Range(-2, 2), Random.Range(-2, 2));
-                MakeSlice.Invoke(pos, dir);
-            }
+            MakeSlice.Invoke(transform.position, transform.up);
             makeSlice = false;
         }
     }

@@ -90,6 +90,7 @@ public class Sliceable : MonoBehaviour
         List<Vector2> newUVs = new List<Vector2>();
         List<int> newTriangles = new List<int>();
 
+        Dictionary<(int,int), int> cutPoints = new Dictionary<(int, int), int>();
         List<(int,int)> cutEdges = new List<(int, int)>();
 
         //get mesh data
@@ -186,64 +187,101 @@ public class Sliceable : MonoBehaviour
             }
 
             //add new geometry
-            float t1, t2;
-            Vector3 newPoint1, newPoint2;
-            Vector2 newUV1, newUV2;
-            Vector3 newNormal1, newNormal2;
+            int newPoint1=0, newPoint2=0;
             switch (count)
             {
                 case 0:
                     continue;
                 case 1:
-                    //get intercept points
-                    t1 = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
-                    newPoint1 = EdgeIntercept(vertices[v1], vertices[v2], t1);
-                    newUV1 = EdgeUV(UVs[v1], UVs[v2], t1);
-                    newNormal1 = EdgeNormal(normals[v1], normals[v2], t1);
+                    //get intercept point 1
+                    if (cutPoints.ContainsKey((v1, v2)))
+                    {
+                        //get existing point
+                        newPoint1 = cutPoints[(v1, v2)];
+                    }
+                    else
+                    {
+                        //create new point
+                        newPoint1 = newVertices.Count;
 
-                    t2 = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
-                    newPoint2 = EdgeIntercept(vertices[v1], vertices[v3], t2);
-                    newUV2 = EdgeUV(UVs[v1], UVs[v3], t2);
-                    newNormal2 = EdgeNormal(normals[v1], normals[v3], t2);
+                        float t = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v2], t));
+                        newUVs.Add(EdgeUV(UVs[v1], UVs[v2], t));
+                        newNormals.Add(EdgeNormal(normals[v1], normals[v2], t));
+
+                        cutPoints.Add((v1, v2), newPoint1);
+                    }
+
+                    //get intercept point 2
+                    if (cutPoints.ContainsKey((v1, v3)))
+                    {
+                        //get existing point
+                        newPoint2 = cutPoints[(v1, v3)];
+                    }
+                    else
+                    {
+                        //create new point
+                        newPoint2 = newVertices.Count;
+
+                        float t = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v3], t));
+                        newUVs.Add(EdgeUV(UVs[v1], UVs[v3], t));
+                        newNormals.Add(EdgeNormal(normals[v1], normals[v3], t));
+
+                        cutPoints.Add((v1, v3), newPoint2);
+                    }
 
                     //add triangle to slice
-                    newTriangles.AddRange(new int[] { vectorDict[v1], newVertices.Count, newVertices.Count + 1});
+                    newTriangles.AddRange(new int[] { vectorDict[v1], newPoint1, newPoint2});
                     //add new edge to list
-                    cutEdges.Add((newVertices.Count, newVertices.Count + 1));
-                    //new point 1
-                    newVertices.Add(newPoint1);
-                    newNormals.Add(newNormal1);
-                    newUVs.Add(newUV1);
-                    //new point 2
-                    newVertices.Add(newPoint2);
-                    newNormals.Add(newNormal2);
-                    newUVs.Add(newUV2);
+                    cutEdges.Add((newPoint1, newPoint2));
+
                     break;
                 case 2:
-                    //get intercept points
-                    t1 = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
-                    newPoint1 = EdgeIntercept(vertices[v1], vertices[v2], t1);
-                    newUV1 = EdgeUV(UVs[v1], UVs[v2], t1);
-                    newNormal1 = EdgeNormal(normals[v1], normals[v2], t1);
+                    //get intercept point 1
+                    if (cutPoints.ContainsKey((v1, v2)))
+                    {
+                        //get existing point
+                        newPoint1 = cutPoints[(v1, v2)];
+                    }
+                    else
+                    {
+                        //create new point
+                        newPoint1 = newVertices.Count;
 
-                    t2 = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
-                    newPoint2 = EdgeIntercept(vertices[v1], vertices[v3], t2);
-                    newUV2 = EdgeUV(UVs[v1], UVs[v3], t2);
-                    newNormal2 = EdgeNormal(normals[v1], normals[v3], t2);
+                        float t = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v2], t));
+                        newUVs.Add(EdgeUV(UVs[v1], UVs[v2], t));
+                        newNormals.Add(EdgeNormal(normals[v1], normals[v2], t));
+
+                        cutPoints.Add((v1, v2), newPoint1);
+                    }
+
+                    //get intercept point 2
+                    if (cutPoints.ContainsKey((v1, v3)))
+                    {
+                        //get existing point
+                        newPoint2 = cutPoints[(v1, v3)];
+                    }
+                    else
+                    {
+                        //create new point
+                        newPoint2 = newVertices.Count;
+
+                        float t = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v3], t));
+                        newUVs.Add(EdgeUV(UVs[v1], UVs[v3], t));
+                        newNormals.Add(EdgeNormal(normals[v1], normals[v3], t));
+
+                        cutPoints.Add((v1, v3), newPoint2);
+                    }
 
                     //add trapezoid to slice
-                    newTriangles.AddRange(new int[] { newVertices.Count, vectorDict[v2], vectorDict[v3] });
-                    newTriangles.AddRange(new int[] { newVertices.Count, vectorDict[v3], newVertices.Count + 1 });
+                    newTriangles.AddRange(new int[] { newPoint1, vectorDict[v2], vectorDict[v3] });
+                    newTriangles.AddRange(new int[] { newPoint1, vectorDict[v3], newPoint2 });
                     //add new edge to list
-                    cutEdges.Add((newVertices.Count + 1, newVertices.Count));
-                    //new point 1
-                    newVertices.Add(newPoint1);
-                    newNormals.Add(newNormal1);
-                    newUVs.Add(newUV1);
-                    //new point 2
-                    newVertices.Add(newPoint2);
-                    newNormals.Add(newNormal2);
-                    newUVs.Add(newUV2);
+                    cutEdges.Add((newPoint2, newPoint1));
+
                     break;
                 case 3:
                     //add traingle to slice
