@@ -4,10 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+[System.Serializable] enum EdgeFillMode { None, Simple, Triangulate }
+[System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
+
 public class Sliceable : MonoBehaviour
 {
     [SerializeField] MeshFilter meshFilter;
     [SerializeField] MeshFilter emptyPrefab;
+    [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Simple;
+    [SerializeField] MomentumMode momentumMode = MomentumMode.Simple;
 
     private void Awake()
     {
@@ -318,118 +323,112 @@ public class Sliceable : MonoBehaviour
 
 
 
-        //TODO - make better algorithm for complex shapes
-        /*
-        //find center point of new points on edge
-        if (cutEdges.Count > 0)
+        if (edgeFillMode == EdgeFillMode.Simple)
         {
-            Vector3 centerPoint = Vector3.zero;
-            for (int i = 0; i < cutEdges.Count; ++i)
+            //find center point of new points on edge
+            if (cutEdges.Count > 0)
             {
-                centerPoint += newVertices[cutEdges[i].Item1] + newVertices[cutEdges[i].Item2];
-            }
-            centerPoint /= cutEdges.Count * 2;
+                Vector3 centerPoint = Vector3.zero;
+                for (int i = 0; i < cutEdges.Count; ++i)
+                {
+                    centerPoint += newVertices[cutEdges[i].Item1] + newVertices[cutEdges[i].Item2];
+                }
+                centerPoint /= cutEdges.Count * 2;
 
-            int centerPointIndex = newVertices.Count;
-            newVertices.Add(centerPoint);
-            newNormals.Add(-planeNormal);
-            newUVs.Add(Vector2.zero);
-
-            //add new geometry into plane
-            for (int i = 0; i < cutEdges.Count; ++i)
-            {
-                //new traingle
-                newTriangles.AddRange(new int[] { newVertices.Count + 1, newVertices.Count, centerPointIndex });
-
-                //new points
-                newVertices.Add(newVertices[cutEdges[i].Item1]);
+                int centerPointIndex = newVertices.Count;
+                newVertices.Add(centerPoint);
                 newNormals.Add(-planeNormal);
                 newUVs.Add(Vector2.zero);
 
-                newVertices.Add(newVertices[cutEdges[i].Item2]);
-                newNormals.Add(-planeNormal);
-                newUVs.Add(Vector2.zero);
-            }
-        }
-        */
-
-        //group cut points by position
-        Dictionary<Vector3, List<int>> cutPositions = new Dictionary<Vector3, List<int>>((new Vector3Comparer(0.00001f)));
-        foreach (KeyValuePair<(int,int),int> cutPoint in cutPoints)
-        {
-            Vector3 pos = newVertices[cutPoint.Value];
-            if (!cutPositions.ContainsKey(pos))
-            {
-                cutPositions[pos] = new List<int>();
-            }
-            cutPositions[pos].Add(cutPoint.Value);
-        }
-
-        //combine connected cutPoints to connected path
-        Dictionary<int,int> changedPoints = new Dictionary<int,int>();
-        foreach ((int,int) key in cutPoints.Keys.ToList())
-        {
-            int oldPoint = cutPoints[key];
-            Vector3 pos = newVertices[oldPoint];
-            int newPoint = cutPositions[pos][0];
-            cutPoints[key] = newPoint;
-            changedPoints[oldPoint] = newPoint;
-        }
-
-        //create relationship graph
-        Dictionary<int, List<int>> cutRelations = new Dictionary<int, List<int>>();
-        for (int i=0; i<cutEdges.Count; ++i)
-        {
-            int v1 = changedPoints[cutEdges[i].Item1];
-            int v2 = changedPoints[cutEdges[i].Item2];
-            if (!cutRelations.ContainsKey(v1)) cutRelations[v1] = new List<int>();
-            if (!cutRelations.ContainsKey(v2)) cutRelations[v2] = new List<int>();
-            cutRelations[v1].Add(v2);
-            cutRelations[v2].Add(v1);
-        }
-
-        //attempt to get loops
-        List<List<int>> loops = new List<List<int>>();
-        while(cutRelations.Keys.Count > 0)
-        {
-            List<int> loop = new List<int>();
-            int first = cutRelations.Keys.First();
-            int point = first;
-            while (cutRelations.ContainsKey(point))
-            {
-                //size check
-                if (cutRelations[point].Count != 2)
+                //add new geometry into plane
+                for (int i = 0; i < cutEdges.Count; ++i)
                 {
-                    cutRelations.Remove(point);
-                    break;
+                    //new traingle
+                    newTriangles.AddRange(new int[] { newVertices.Count + 1, newVertices.Count, centerPointIndex });
+
+                    //new points
+                    newVertices.Add(newVertices[cutEdges[i].Item1]);
+                    newNormals.Add(-planeNormal);
+                    newUVs.Add(Vector2.zero);
+
+                    newVertices.Add(newVertices[cutEdges[i].Item2]);
+                    newNormals.Add(-planeNormal);
+                    newUVs.Add(Vector2.zero);
+                }
+            }
+        }
+        else if (edgeFillMode == EdgeFillMode.Triangulate)
+        {
+            //group cut points by position
+            Dictionary<Vector3, List<int>> cutPositions = new Dictionary<Vector3, List<int>>((new Vector3Comparer(0.00001f)));
+            foreach (KeyValuePair<(int, int), int> cutPoint in cutPoints)
+            {
+                Vector3 pos = newVertices[cutPoint.Value];
+                Debug.DrawLine(pos, pos + 0.1f * planeNormal, Color.yellow, 1);
+                if (!cutPositions.ContainsKey(pos))
+                {
+                    cutPositions[pos] = new List<int>();
+                }
+                cutPositions[pos].Add(cutPoint.Value);
+            }
+
+            //combine connected cutPoints to connected path
+            Dictionary<int, int> changedPoints = new Dictionary<int, int>();
+            foreach ((int, int) key in cutPoints.Keys.ToList())
+            {
+                int oldPoint = cutPoints[key];
+                Vector3 pos = newVertices[oldPoint];
+                int newPoint = cutPositions[pos][0];
+                Debug.DrawLine(newVertices[newPoint] + 0.1f * planeNormal, pos + 0.2f * planeNormal, Color.white, 1);
+                cutPoints[key] = newPoint;
+                changedPoints[oldPoint] = newPoint;
+            }
+
+            //create relationship graph
+            Dictionary<int, int> direct = new Dictionary<int, int>();
+            for (int i = 0; i < cutEdges.Count; ++i)
+            {
+                Debug.DrawLine(newVertices[cutEdges[i].Item1] - planeNormal * 0.1f, newVertices[cutEdges[i].Item2] - planeNormal * 0.1f, Color.grey, 1);
+                int v1 = changedPoints[cutEdges[i].Item1];
+                int v2 = changedPoints[cutEdges[i].Item2];
+                Debug.DrawLine(newVertices[v1] - planeNormal * 0.2f, newVertices[v2] - planeNormal * 0.2f, Color.cyan, 1);
+                direct[v1] = v2;
+            }
+
+            //attempt to get loops
+            List<List<int>> loops = new List<List<int>>();
+            while (direct.Keys.Count > 0)
+            {
+                List<int> loop = new List<int>();
+                int first = direct.Keys.First();
+                int point = first;
+
+                //traverse until end of loop found
+                while (direct.ContainsKey(point))
+                {
+                    loop.Add(point);
+
+                    int oldPoint = point;
+                    point = direct[point];
+
+                    direct.Remove(oldPoint);
                 }
 
-                loop.Add(point);
-
-                int oldPoint = point;
-                if (cutRelations.ContainsKey(cutRelations[point][0]))
+                //if loop closed
+                if (point == first)
                 {
-                    point = cutRelations[point][0];
-                }
-                else
-                {
-                    point = cutRelations[point][1];
+                    loops.Add(loop);
                 }
 
-                cutRelations.Remove(oldPoint);
+                string s = "";
+                Color color = new Color[] { Color.red, Color.blue, Color.green, Color.black }[UnityEngine.Random.Range(0, 4)];
+                for (int j = 0; j < loop.Count; ++j)
+                {
+                    s += loop[j].ToString() + ", ";
+                    Debug.DrawLine(newVertices[loop[j]], newVertices[loop[(j + 1) % loop.Count]], color, 1);
+                }
+                Debug.Log(s);
             }
-
-            if (point == first)
-            {
-                loops.Add(loop);
-            }
-
-            string s = "";
-            for (int j = 0; j < loop.Count; ++j)
-            {
-                s += loop[j].ToString() + ", ";
-            }
-            Debug.Log(s);
         }
 
 
@@ -477,8 +476,15 @@ public class Sliceable : MonoBehaviour
         Rigidbody newRigidBody = newFilter.GetComponent<Rigidbody>();
         if (oldRigidBody != null && newRigidBody != null)
         {
-            newRigidBody.velocity = oldRigidBody.velocity;
-            newRigidBody.angularVelocity = oldRigidBody.angularVelocity;
+            if (momentumMode == MomentumMode.Simple)
+            {
+                newRigidBody.velocity = oldRigidBody.velocity;
+                newRigidBody.angularVelocity = oldRigidBody.angularVelocity;
+            }
+            else if (momentumMode == MomentumMode.Advanced)
+            {
+                Debug.LogWarning("MomentumMode 'Advanced' not yet implemented!");
+            }
         }
 
         return newFilter.gameObject;
@@ -499,14 +505,14 @@ public class Sliceable : MonoBehaviour
 
         //get new slices
         Mesh slice1 = GetMeshSlice(original, planePoint, planeNormal);
-        //Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
+        Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
 
         //check that object is split
-        if (true)
+        if (slice2 != null)
         {
             //assign new slices to GameObjects
             CreateNewPeice(emptyPrefab, slice1);
-            //CreateNewPeice(emptyPrefab, slice2);
+            CreateNewPeice(emptyPrefab, slice2);
 
             //destroy original object
             Destroy(gameObject);
