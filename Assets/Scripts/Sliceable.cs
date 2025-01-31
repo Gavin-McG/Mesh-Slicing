@@ -302,10 +302,6 @@ public class Sliceable : MonoBehaviour
                 centerPoint += newVertices[cutEdges[i].Item1] + newVertices[cutEdges[i].Item2];
             }
             centerPoint /= cutEdges.Count * 2;
-            if (centerPoint.magnitude > 0.05)
-            {
-                Debug.LogWarning("Big centerpoint");
-            }
 
             int centerPointIndex = newVertices.Count;
             newVertices.Add(centerPoint);
