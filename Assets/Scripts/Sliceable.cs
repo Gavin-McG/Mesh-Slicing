@@ -112,6 +112,15 @@ public class Sliceable : MonoBehaviour
         }
     }
 
+    Vector3 GetOrthogonalVector(Vector3 v)
+    {
+        Vector3 orthogonal = Mathf.Abs(v.x) > Mathf.Abs(v.z) ? 
+                new Vector3(-v.y, v.x, 0) : 
+                new Vector3(0, -v.z, v.y);
+        orthogonal.Normalize();
+        return orthogonal;
+    }
+
     Mesh GetMeshSlice(Mesh original, Vector3 planePoint, Vector3 planeNormal)
     {
         //values for first new mesh
@@ -364,7 +373,6 @@ public class Sliceable : MonoBehaviour
             foreach (KeyValuePair<(int, int), int> cutPoint in cutPoints)
             {
                 Vector3 pos = newVertices[cutPoint.Value];
-                Debug.DrawLine(pos, pos + 0.1f * planeNormal, Color.yellow, 1);
                 if (!cutPositions.ContainsKey(pos))
                 {
                     cutPositions[pos] = new List<int>();
@@ -379,7 +387,6 @@ public class Sliceable : MonoBehaviour
                 int oldPoint = cutPoints[key];
                 Vector3 pos = newVertices[oldPoint];
                 int newPoint = cutPositions[pos][0];
-                Debug.DrawLine(newVertices[newPoint] + 0.1f * planeNormal, pos + 0.2f * planeNormal, Color.white, 1);
                 cutPoints[key] = newPoint;
                 changedPoints[oldPoint] = newPoint;
             }
@@ -388,11 +395,12 @@ public class Sliceable : MonoBehaviour
             Dictionary<int, int> direct = new Dictionary<int, int>();
             for (int i = 0; i < cutEdges.Count; ++i)
             {
-                Debug.DrawLine(newVertices[cutEdges[i].Item1] - planeNormal * 0.1f, newVertices[cutEdges[i].Item2] - planeNormal * 0.1f, Color.grey, 1);
                 int v1 = changedPoints[cutEdges[i].Item1];
                 int v2 = changedPoints[cutEdges[i].Item2];
-                Debug.DrawLine(newVertices[v1] - planeNormal * 0.2f, newVertices[v2] - planeNormal * 0.2f, Color.cyan, 1);
-                direct[v1] = v2;
+                if (v1 != v2)
+                {
+                    direct[v1] = v2;
+                }
             }
 
             //attempt to get loops
@@ -419,18 +427,42 @@ public class Sliceable : MonoBehaviour
                 {
                     loops.Add(loop);
                 }
+            }
 
-                string s = "";
-                Color color = new Color[] { Color.red, Color.blue, Color.green, Color.black }[UnityEngine.Random.Range(0, 4)];
-                for (int j = 0; j < loop.Count; ++j)
+            
+            Vector3 dir1 = GetOrthogonalVector(planeNormal);
+            Vector3 dir2 = Vector3.Cross(planeNormal, dir1);
+            foreach (List<int> loop in loops)
+            {
+                //turn loops into 2d list
+                Debug.Log(loop.Count);
+                List<Vector2> polygon = new List<Vector2>();
+                foreach (int point in loop)
                 {
-                    s += loop[j].ToString() + ", ";
-                    Debug.DrawLine(newVertices[loop[j]], newVertices[loop[(j + 1) % loop.Count]], color, 1);
+                    Vector3 pos = newVertices[point];
+                    float comp1 = Vector3.Dot(dir1, pos);
+                    float comp2 = Vector3.Dot(dir2, pos);
+                    polygon.Add(new Vector2 (comp1, comp2));
                 }
-                Debug.Log(s);
+
+                //get triangulation of points
+                polygon.Reverse();
+                List<(int, int, int)> edgeTriangles = Triangulate.TriangulatePolygon(polygon);
+                foreach ((int, int, int) triangle in edgeTriangles)
+                {
+                    newTriangles.Add(newVertices.Count + triangle.Item2);
+                    newTriangles.Add(newVertices.Count +  triangle.Item1);
+                    newTriangles.Add(newVertices.Count + triangle.Item3);
+                }
+
+                foreach (int point in loop)
+                {
+                    newVertices.Add(newVertices[point]);
+                    newUVs.Add(Vector2.zero);
+                    newNormals.Add(-planeNormal);
+                }
             }
         }
-
 
         //create new mesh
         Mesh slice = new Mesh();

@@ -66,7 +66,7 @@ Shader "Custom/Standard"
 
                 Blend[_SrcBlend][_DstBlend]
                 ZWrite[_ZWrite]
-                Cull Off
+                Cull OFF
 
                 CGPROGRAM
                 #pragma target 3.0
