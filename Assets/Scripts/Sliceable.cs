@@ -81,6 +81,32 @@ public class Sliceable : MonoBehaviour
         return normal1 + t * (normal2 - normal1);
     }
 
+    public class Vector3Comparer : IEqualityComparer<Vector3>
+    {
+        private readonly float epsilon;
+
+        public Vector3Comparer(float epsilon = 0.001f)
+        {
+            this.epsilon = epsilon;
+        }
+
+        public bool Equals(Vector3 v1, Vector3 v2)
+        {
+            return Mathf.Abs(v1.x - v2.x) < epsilon &&
+                   Mathf.Abs(v1.y - v2.y) < epsilon &&
+                   Mathf.Abs(v1.z - v2.z) < epsilon;
+        }
+
+        public int GetHashCode(Vector3 obj)
+        {
+            // Round to avoid floating-point inconsistencies
+            int xHash = Mathf.RoundToInt(obj.x / epsilon);
+            int yHash = Mathf.RoundToInt(obj.y / epsilon);
+            int zHash = Mathf.RoundToInt(obj.z / epsilon);
+            return xHash ^ yHash << 2 ^ zHash >> 2;
+        }
+    }
+
     Mesh GetMeshSlice(Mesh original, Vector3 planePoint, Vector3 planeNormal)
     {
         //values for first new mesh
@@ -293,6 +319,7 @@ public class Sliceable : MonoBehaviour
 
 
         //TODO - make better algorithm for complex shapes
+        /*
         //find center point of new points on edge
         if (cutEdges.Count > 0)
         {
@@ -324,7 +351,87 @@ public class Sliceable : MonoBehaviour
                 newUVs.Add(Vector2.zero);
             }
         }
-        
+        */
+
+        //group cut points by position
+        Dictionary<Vector3, List<int>> cutPositions = new Dictionary<Vector3, List<int>>((new Vector3Comparer(0.00001f)));
+        foreach (KeyValuePair<(int,int),int> cutPoint in cutPoints)
+        {
+            Vector3 pos = newVertices[cutPoint.Value];
+            if (!cutPositions.ContainsKey(pos))
+            {
+                cutPositions[pos] = new List<int>();
+            }
+            cutPositions[pos].Add(cutPoint.Value);
+        }
+
+        //combine connected cutPoints to connected path
+        Dictionary<int,int> changedPoints = new Dictionary<int,int>();
+        foreach ((int,int) key in cutPoints.Keys.ToList())
+        {
+            int oldPoint = cutPoints[key];
+            Vector3 pos = newVertices[oldPoint];
+            int newPoint = cutPositions[pos][0];
+            cutPoints[key] = newPoint;
+            changedPoints[oldPoint] = newPoint;
+        }
+
+        //create relationship graph
+        Dictionary<int, List<int>> cutRelations = new Dictionary<int, List<int>>();
+        for (int i=0; i<cutEdges.Count; ++i)
+        {
+            int v1 = changedPoints[cutEdges[i].Item1];
+            int v2 = changedPoints[cutEdges[i].Item2];
+            if (!cutRelations.ContainsKey(v1)) cutRelations[v1] = new List<int>();
+            if (!cutRelations.ContainsKey(v2)) cutRelations[v2] = new List<int>();
+            cutRelations[v1].Add(v2);
+            cutRelations[v2].Add(v1);
+        }
+
+        //attempt to get loops
+        List<List<int>> loops = new List<List<int>>();
+        while(cutRelations.Keys.Count > 0)
+        {
+            List<int> loop = new List<int>();
+            int first = cutRelations.Keys.First();
+            int point = first;
+            while (cutRelations.ContainsKey(point))
+            {
+                //size check
+                if (cutRelations[point].Count != 2)
+                {
+                    cutRelations.Remove(point);
+                    break;
+                }
+
+                loop.Add(point);
+
+                int oldPoint = point;
+                if (cutRelations.ContainsKey(cutRelations[point][0]))
+                {
+                    point = cutRelations[point][0];
+                }
+                else
+                {
+                    point = cutRelations[point][1];
+                }
+
+                cutRelations.Remove(oldPoint);
+            }
+
+            if (point == first)
+            {
+                loops.Add(loop);
+            }
+
+            string s = "";
+            for (int j = 0; j < loop.Count; ++j)
+            {
+                s += loop[j].ToString() + ", ";
+            }
+            Debug.Log(s);
+        }
+
 
         //create new mesh
         Mesh slice = new Mesh();
@@ -392,14 +499,14 @@ public class Sliceable : MonoBehaviour
 
         //get new slices
         Mesh slice1 = GetMeshSlice(original, planePoint, planeNormal);
-        Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
+        //Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
 
         //check that object is split
-        if (slice2 != null)
+        if (true)
         {
             //assign new slices to GameObjects
             CreateNewPeice(emptyPrefab, slice1);
-            CreateNewPeice(emptyPrefab, slice2);
+            //CreateNewPeice(emptyPrefab, slice2);
 
             //destroy original object
             Destroy(gameObject);
