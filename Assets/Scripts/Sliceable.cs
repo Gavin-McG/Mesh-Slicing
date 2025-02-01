@@ -435,18 +435,16 @@ public class Sliceable : MonoBehaviour
             foreach (List<int> loop in loops)
             {
                 //turn loops into 2d list
-                Debug.Log(loop.Count);
                 List<Vector2> polygon = new List<Vector2>();
                 foreach (int point in loop)
                 {
                     Vector3 pos = newVertices[point];
                     float comp1 = Vector3.Dot(dir1, pos);
                     float comp2 = Vector3.Dot(dir2, pos);
-                    polygon.Add(new Vector2 (comp1, comp2));
+                    polygon.Add(new Vector2 (comp2, comp1));
                 }
 
                 //get triangulation of points
-                polygon.Reverse();
                 List<(int, int, int)> edgeTriangles = Triangulate.TriangulatePolygon(polygon);
                 foreach ((int, int, int) triangle in edgeTriangles)
                 {
