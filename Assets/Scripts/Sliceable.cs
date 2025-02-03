@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 [System.Serializable] enum EdgeFillMode { None, Simple, Triangulate }
 [System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
@@ -13,6 +15,7 @@ public class Sliceable : MonoBehaviour
     [SerializeField] MeshFilter emptyPrefab;
     [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Simple;
     [SerializeField] MomentumMode momentumMode = MomentumMode.Simple;
+    [SerializeField] bool SaveNoLoop = false;
 
     private void Awake()
     {
@@ -86,31 +89,14 @@ public class Sliceable : MonoBehaviour
         return normal1 + t * (normal2 - normal1);
     }
 
-    public class Vector3Comparer : IEqualityComparer<Vector3>
+    float epsilon = 0.0001f;
+    public bool VectorsClose(Vector3 v1, Vector3 v2)
     {
-        private readonly float epsilon;
-
-        public Vector3Comparer(float epsilon = 0.001f)
-        {
-            this.epsilon = epsilon;
-        }
-
-        public bool Equals(Vector3 v1, Vector3 v2)
-        {
-            return Mathf.Abs(v1.x - v2.x) < epsilon &&
-                   Mathf.Abs(v1.y - v2.y) < epsilon &&
-                   Mathf.Abs(v1.z - v2.z) < epsilon;
-        }
-
-        public int GetHashCode(Vector3 obj)
-        {
-            // Round to avoid floating-point inconsistencies
-            int xHash = Mathf.RoundToInt(obj.x / epsilon);
-            int yHash = Mathf.RoundToInt(obj.y / epsilon);
-            int zHash = Mathf.RoundToInt(obj.z / epsilon);
-            return xHash ^ yHash << 2 ^ zHash >> 2;
-        }
+        return Mathf.Abs(v1.x - v2.x) < epsilon &&
+               Mathf.Abs(v1.y - v2.y) < epsilon &&
+               Mathf.Abs(v1.z - v2.z) < epsilon;
     }
+
 
     Vector3 GetOrthogonalVector(Vector3 v)
     {
@@ -368,43 +354,43 @@ public class Sliceable : MonoBehaviour
         }
         else if (edgeFillMode == EdgeFillMode.Triangulate)
         {
-            //group cut points by position
-            Dictionary<Vector3, List<int>> cutPositions = new Dictionary<Vector3, List<int>>((new Vector3Comparer(0.00001f)));
-            foreach (KeyValuePair<(int, int), int> cutPoint in cutPoints)
+            //match vectors which are close enough
+            List<int> pointIndexes = cutPoints.Values.ToList();
+            Dictionary<int,int> closeIndexes = new();
+            for (int i=0; i<pointIndexes.Count; ++i)
             {
-                Vector3 pos = newVertices[cutPoint.Value];
-                if (!cutPositions.ContainsKey(pos))
+                bool foundClose = false;
+                for (int j=0; j<i; ++j)
                 {
-                    cutPositions[pos] = new List<int>();
+                    if (VectorsClose(newVertices[pointIndexes[i]], newVertices[pointIndexes[j]]))
+                    {
+                        closeIndexes[pointIndexes[i]] = pointIndexes[j];
+                        foundClose = true;
+                        break;
+                    }
                 }
-                cutPositions[pos].Add(cutPoint.Value);
-            }
-
-            //combine connected cutPoints to connected path
-            Dictionary<int, int> changedPoints = new Dictionary<int, int>();
-            foreach ((int, int) key in cutPoints.Keys.ToList())
-            {
-                int oldPoint = cutPoints[key];
-                Vector3 pos = newVertices[oldPoint];
-                int newPoint = cutPositions[pos][0];
-                cutPoints[key] = newPoint;
-                changedPoints[oldPoint] = newPoint;
+                if (!foundClose)
+                {
+                    closeIndexes[pointIndexes[i]] = pointIndexes[i];
+                }
             }
 
             //create relationship graph
             Dictionary<int, int> direct = new Dictionary<int, int>();
             for (int i = 0; i < cutEdges.Count; ++i)
             {
-                int v1 = changedPoints[cutEdges[i].Item1];
-                int v2 = changedPoints[cutEdges[i].Item2];
+                int v1 = closeIndexes[cutEdges[i].Item1];
+                int v2 = closeIndexes[cutEdges[i].Item2];
                 if (v1 != v2)
                 {
                     direct[v1] = v2;
                 }
             }
+            
 
             //attempt to get loops
             List<List<int>> loops = new List<List<int>>();
+            int checkCount = 0;
             while (direct.Keys.Count > 0)
             {
                 List<int> loop = new List<int>();
@@ -418,7 +404,6 @@ public class Sliceable : MonoBehaviour
 
                     int oldPoint = point;
                     point = direct[point];
-
                     direct.Remove(oldPoint);
                 }
 
@@ -427,6 +412,7 @@ public class Sliceable : MonoBehaviour
                 {
                     loops.Add(loop);
                 }
+                checkCount++;
             }
 
             

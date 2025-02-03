@@ -44,7 +44,7 @@ public static class Triangulate
             foreach (PointInfo i in pointInfo)
             {
                 if (i.index == prev.index || i.index == index || i.index == next.index) continue;
-                if (PointInTriangle(i.pos, a, b, c)) return false;
+                if (IsPointInsideTriangle(i.pos, a, b, c)) return false;
             }
             return true;
         }
@@ -68,7 +68,6 @@ public static class Triangulate
             pointInfo[i].prev = pointInfo[prevIndex];
             pointInfo[i].next = pointInfo[nextIndex];
             pointInfo[i].CalculateAngle();
-            Debug.DrawLine(pointInfo[i].pos, pointInfo[i].next.pos, Color.black);
         }
 
         while (pointInfo.Count > 2)
@@ -94,26 +93,29 @@ public static class Triangulate
             if (!earFound) break; // Prevent infinite loop
         }
 
-        for (int i=0; i<triangles.Count; ++i)
-        {
-            Debug.DrawLine(polygon[triangles[i].Item1], polygon[triangles[i].Item2], Color.red);
-            Debug.DrawLine(polygon[triangles[i].Item2], polygon[triangles[i].Item3], Color.blue);
-            Debug.DrawLine(polygon[triangles[i].Item3], polygon[triangles[i].Item1], Color.green);
-        }
         return triangles;
     }
 
-    private static float GetTriangleArea(Vector2 a, Vector2 b, Vector2 c)
+    private static bool IsPointInsideTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
     {
-        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    }
+        // Compute vectors
+        Vector2 v0 = c - a;
+        Vector2 v1 = b - a;
+        Vector2 v2 = p - a;
 
-    private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
-    {
-        float areaOrig = Mathf.Abs(GetTriangleArea(a, b, c));
-        float area1 = Mathf.Abs(GetTriangleArea(p, b, c));
-        float area2 = Mathf.Abs(GetTriangleArea(a, p, c));
-        float area3 = Mathf.Abs(GetTriangleArea(a, b, p));
-        return Mathf.Abs(areaOrig - (area1 + area2 + area3)) < 1e-5;
+        // Compute dot products
+        float dot00 = Vector2.Dot(v0, v0);
+        float dot01 = Vector2.Dot(v0, v1);
+        float dot02 = Vector2.Dot(v0, v2);
+        float dot11 = Vector2.Dot(v1, v1);
+        float dot12 = Vector2.Dot(v1, v2);
+
+        // Compute barycentric coordinates
+        float invDenom = 1f / (dot00 * dot11 - dot01 * dot01);
+        float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+        float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+        // Check if point is inside the triangle
+        return (u >= 0) && (v >= 0) && (u + v <= 1);
     }
 }
