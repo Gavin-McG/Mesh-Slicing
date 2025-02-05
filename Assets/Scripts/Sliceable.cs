@@ -97,14 +97,32 @@ public class Sliceable : MonoBehaviour
                Mathf.Abs(v1.z - v2.z) < epsilon;
     }
 
-
-    Vector3 GetOrthogonalVector(Vector3 v)
+    List<List<int>> ConnectionsToLoops(Dictionary<int, int> direct)
     {
-        Vector3 orthogonal = Mathf.Abs(v.x) > Mathf.Abs(v.z) ? 
-                new Vector3(-v.y, v.x, 0) : 
-                new Vector3(0, -v.z, v.y);
-        orthogonal.Normalize();
-        return orthogonal;
+        List<List<int>> loops = new List<List<int>>();
+        while (direct.Keys.Count > 0)
+        {
+            List<int> loop = new List<int>();
+            int first = direct.Keys.First();
+            int point = first;
+
+            //traverse until end of loop found
+            while (direct.ContainsKey(point))
+            {
+                loop.Add(point);
+
+                int oldPoint = point;
+                point = direct[point];
+                direct.Remove(oldPoint);
+            }
+
+            //if loop closed
+            if (point == first)
+            {
+                loops.Add(loop);
+            }
+        }
+        return loops;
     }
 
     Mesh GetMeshSlice(Mesh original, Vector3 planePoint, Vector3 planeNormal)
@@ -386,62 +404,70 @@ public class Sliceable : MonoBehaviour
                     direct[v1] = v2;
                 }
             }
-            
+
 
             //attempt to get loops
-            List<List<int>> loops = new List<List<int>>();
-            int checkCount = 0;
-            while (direct.Keys.Count > 0)
+            List<List<int>> loops = ConnectionsToLoops(direct);
+
+            //get 2d polygons from loops
+            List<Polygon> polygons = Polygon.MakePolygons(loops, newVertices, planeNormal);
+
+            //divide polygons by direction 
+            List<Polygon> polygonsCW = new();
+            List<Polygon> polygonsCCW = new();
+            foreach (Polygon polygon in polygons)
             {
-                List<int> loop = new List<int>();
-                int first = direct.Keys.First();
-                int point = first;
-
-                //traverse until end of loop found
-                while (direct.ContainsKey(point))
+                if (polygon.IsClockwise())
                 {
-                    loop.Add(point);
-
-                    int oldPoint = point;
-                    point = direct[point];
-                    direct.Remove(oldPoint);
+                    polygonsCW.Add(polygon);
                 }
-
-                //if loop closed
-                if (point == first)
+                else
                 {
-                    loops.Add(loop);
+                    polygonsCCW.Add(polygon);
                 }
-                checkCount++;
             }
 
-            
-            Vector3 dir1 = GetOrthogonalVector(planeNormal);
-            Vector3 dir2 = Vector3.Cross(planeNormal, dir1);
-            foreach (List<int> loop in loops)
+            //make bridges to combine polygon with holes
+            foreach (Polygon polygon in polygonsCW)
             {
-                //turn loops into 2d list
-                List<Vector2> polygon = new List<Vector2>();
-                foreach (int point in loop)
+                //get all the holes within the current polygon
+                List<Polygon> holes = new();
+                foreach (Polygon hole in polygonsCCW)
                 {
-                    Vector3 pos = newVertices[point];
-                    float comp1 = Vector3.Dot(dir1, pos);
-                    float comp2 = Vector3.Dot(dir2, pos);
-                    polygon.Add(new Vector2 (comp2, comp1));
+                    if (polygon.IsHoleInside(hole))
+                    {
+                        holes.Add(hole);
+                        Debug.Log("Found hole");
+                    }
+                    else
+                    {
+                        Debug.Log("no hole");
+                    }
                 }
 
+                //find bridges to combine holes
+
+
+                //remove holes from polygonCCW
+
+            }
+
+            //add triangulation of polygon to mesh
+            foreach (Polygon polygon in polygonsCCW)
+            {
                 //get triangulation of points
-                List<(int, int, int)> edgeTriangles = Triangulate.TriangulatePolygon(polygon);
+                List<Vector2> points = polygon.ToPoints();
+                List<(int, int, int)> edgeTriangles = Triangulate.TriangulatePolygon(points);
                 foreach ((int, int, int) triangle in edgeTriangles)
                 {
                     newTriangles.Add(newVertices.Count + triangle.Item2);
-                    newTriangles.Add(newVertices.Count +  triangle.Item1);
+                    newTriangles.Add(newVertices.Count + triangle.Item1);
                     newTriangles.Add(newVertices.Count + triangle.Item3);
                 }
 
-                foreach (int point in loop)
+                foreach (PolygonNode node in polygon.nodes)
                 {
-                    newVertices.Add(newVertices[point]);
+                    newVertices.Add(newVertices[node.index]);
                     newUVs.Add(Vector2.zero);
                     newNormals.Add(-planeNormal);
                 }
@@ -535,4 +561,5 @@ public class Sliceable : MonoBehaviour
             Slicer.MakeSlice.RemoveListener(Slice);
         }
     }
+
 }

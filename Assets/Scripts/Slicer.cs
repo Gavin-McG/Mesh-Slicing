@@ -17,7 +17,7 @@ public class Slicer : MonoBehaviour
            
             MakeSlice.Invoke(transform.position, transform.up);
             
-            //makeSlice = false;
+            makeSlice = false;
         }
     }
 }

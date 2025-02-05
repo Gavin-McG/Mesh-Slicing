@@ -323,7 +323,7 @@ PrefabInstance:
     - target: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -8803937527578110353, guid: 7cfc22bb1bdf6d34797df0cf5be1e1a6, type: 3}
+      objectReference: {fileID: -8803937527578110353, guid: 36d648fed45e5ad40bd84f840e32b67d, type: 3}
     - target: {fileID: 2108902002336450795, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
@@ -342,11 +342,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalRotation.y
@@ -358,7 +358,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
+      value: 90
       objectReference: {fileID: 0}
     - target: {fileID: 3274343254877976036, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
@@ -371,7 +371,7 @@ PrefabInstance:
     - target: {fileID: 7182193146598005623, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -8803937527578110353, guid: 7cfc22bb1bdf6d34797df0cf5be1e1a6, type: 3}
+      objectReference: {fileID: -8803937527578110353, guid: 36d648fed45e5ad40bd84f840e32b67d, type: 3}
     - target: {fileID: 7934931669055476929, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
       propertyPath: m_Name
       value: Empty
