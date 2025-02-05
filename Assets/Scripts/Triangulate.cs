@@ -98,6 +98,8 @@ public static class Triangulate
 
     private static bool IsPointInsideTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
     {
+        const float epsilon = 1e-6f;
+
         // Compute vectors
         Vector2 v0 = c - a;
         Vector2 v1 = b - a;
@@ -116,6 +118,6 @@ public static class Triangulate
         float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
 
         // Check if point is inside the triangle
-        return (u >= 0) && (v >= 0) && (u + v <= 1);
+        return (u > epsilon) && (v > epsilon) && (u + v < 1-epsilon);
     }
 }

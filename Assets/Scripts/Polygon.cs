@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -31,6 +32,11 @@ public class Polygon
         {
             nodes.Add(new PolygonNode(points[i], indexes[i]));
         }
+    }
+
+    public Polygon(List<PolygonNode> nodes)
+    {
+        this.nodes = nodes;
     }
 
     //return a list of vector2 points
@@ -186,5 +192,120 @@ public class Polygon
         }
 
         return sum > 0; // True if clockwise, False if counter-clockwise
+    }
+
+
+
+
+    //attepts to combine a hole into a polygon by checking bridge compatibility
+    public bool CombineHole(Polygon hole, List<Polygon> allHoles)
+    {
+        //create list of potential bridges
+        List<(float sqDist, int polyIndex, int holeIndex)> bridges = new();
+        for (int i=0; i<nodes.Count; ++i)
+        {
+            for (int j=0; j<hole.nodes.Count; ++j)
+            {
+                bridges.Add((Vector2.SqrMagnitude(nodes[i].pos - hole.nodes[j].pos), i, j));
+            }
+        }
+
+        //sort potential bridges
+        bridges.Sort((x, y) => x.sqDist.CompareTo(y.sqDist));
+
+        //look through bridges
+        foreach (var bridge in bridges)
+        {
+            Vector2 p1 = nodes[bridge.polyIndex].pos;
+            Vector2 p2 = hole.nodes[bridge.holeIndex].pos;
+
+            bool validBridge = true;
+
+            //check against this polygon
+            for (int i=0,j=nodes.Count-1; i<nodes.Count; j=i++)
+            {
+                if (bridge.polyIndex == i || bridge.polyIndex == j) continue;
+
+                Vector2 q1 = nodes[i].pos;
+                Vector2 q2 = nodes[j].pos;
+
+                if (DoLinesIntersect(p1,p2,q1,q2))
+                {
+                    validBridge = false; 
+                    break;
+                }
+            }
+            if (!validBridge) continue;
+
+            //check against this hole
+            for (int i = 0, j = hole.nodes.Count-1; i < hole.nodes.Count; j = i++)
+            {
+                if (bridge.holeIndex == i || bridge.holeIndex == j) continue;
+
+                Vector2 q1 = hole.nodes[i].pos;
+                Vector2 q2 = hole.nodes[j].pos;
+
+                if (DoLinesIntersect(p1, p2, q1, q2))
+                {
+                    validBridge = false;
+                    break;
+                }
+            }
+            if (!validBridge) continue;
+
+            //check against other holes
+            foreach (Polygon otherHole in allHoles)
+            {
+                if (otherHole == hole) continue;
+
+                for (int i = 0, j = otherHole.nodes.Count - 1; i < otherHole.nodes.Count; j = i++)
+                {
+                    Vector2 q1 = otherHole.nodes[i].pos;
+                    Vector2 q2 = otherHole.nodes[j].pos;
+
+                    if (DoLinesIntersect(p1, p2, q1, q2))
+                    {
+                        validBridge = false;
+                        break;
+                    }
+                }
+                if (!validBridge) break;
+            }
+
+            //check for bridge validity
+            if (validBridge)
+            {
+                MergeHole(hole, bridge.polyIndex, bridge.holeIndex);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+
+
+    void MergeHole(Polygon Hole, int polyIndex, int holeIndex)
+    {
+        List<PolygonNode> newPolygon = new();
+
+        // Add elements from list1 up to index1 (inclusive)
+        newPolygon.AddRange(nodes.GetRange(0, polyIndex + 1));
+
+        // Add elements from list2 starting from index2 and wrapping around
+        for (int i = holeIndex; i < Hole.nodes.Count; i++)
+        {
+            newPolygon.Add(Hole.nodes[i]);
+        }
+        for (int i = 0; i <= holeIndex; i++)
+        {
+            newPolygon.Add(Hole.nodes[i]);
+        }
+
+        // Add elements from list1 starting from index1 (inclusive) to the end
+        newPolygon.AddRange(nodes.GetRange(polyIndex, nodes.Count - polyIndex));
+
+        nodes = newPolygon;
     }
 }

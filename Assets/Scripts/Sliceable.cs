@@ -428,11 +428,11 @@ public class Sliceable : MonoBehaviour
             }
 
             //make bridges to combine polygon with holes
-            foreach (Polygon polygon in polygonsCW)
+            foreach (Polygon polygon in polygonsCCW)
             {
                 //get all the holes within the current polygon
                 List<Polygon> holes = new();
-                foreach (Polygon hole in polygonsCCW)
+                foreach (Polygon hole in polygonsCW)
                 {
                     if (polygon.IsHoleInside(hole))
                     {
@@ -446,10 +446,30 @@ public class Sliceable : MonoBehaviour
                 }
 
                 //find bridges to combine holes
-
+                bool changed = true;
+                while (changed)
+                {
+                    changed = false;
+                    foreach (Polygon hole in holes)
+                    {
+                        if (polygon.CombineHole(hole, polygonsCW))
+                        {
+                            //changed = true;
+                            for (int i=0, j=polygon.nodes.Count-1;i<polygon.nodes.Count;j=i++)
+                            {
+                                Vector3 v1 = transform.TransformPoint(newVertices[polygon.nodes[i].index] + i * 0.01f * planeNormal);
+                                Vector3 v2 = transform.TransformPoint(newVertices[polygon.nodes[j].index] + j * 0.01f * planeNormal);
+                                Debug.DrawLine(v1, v2, Color.red);
+                            }
+                        }
+                    }
+                }
 
                 //remove holes from polygonCCW
-
+                foreach (Polygon hole in holes)
+                {
+                    polygonsCW.Remove(hole);
+                }
             }
 
             //add triangulation of polygon to mesh
@@ -550,7 +570,7 @@ public class Sliceable : MonoBehaviour
         Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
 
         //check that object is split
-        if (slice2 != null)
+        if (slice2)
         {
             //assign new slices to GameObjects
             CreateNewPeice(emptyPrefab, slice1);
@@ -561,5 +581,4 @@ public class Sliceable : MonoBehaviour
             Slicer.MakeSlice.RemoveListener(Slice);
         }
     }
-
 }
