@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System.Text.RegularExpressions;
-
+using Unity.Collections;
 
 public class MeshSaver
 {

@@ -1,10 +1,9 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.VisualScripting;
+using Unity.Collections;
 using UnityEngine;
-using static UnityEditor.PlayerSettings;
+using UnityEngine.ProBuilder.MeshOperations;
 
 [System.Serializable] enum EdgeFillMode { None, Simple, Triangulate }
 [System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
@@ -401,7 +400,7 @@ public class Sliceable : MonoBehaviour
                 int v2 = closeIndexes[cutEdges[i].Item2];
                 if (v1 != v2)
                 {
-                    direct[v1] = v2;
+                    direct[v2] = v1;
                 }
             }
 
@@ -427,52 +426,47 @@ public class Sliceable : MonoBehaviour
                 }
             }
 
-            //make bridges to combine polygon with holes
-            foreach (Polygon polygon in polygonsCCW)
+            foreach (Polygon polygon in polygonsCW)
             {
                 //get all the holes within the current polygon
-                List<Polygon> holes = new();
-                foreach (Polygon hole in polygonsCW)
+                IList<IList<Vector2>> holes = new List<IList<Vector2>>();
+                List<PolygonNode> nodes = new();
+                nodes.AddRange(polygon.nodes);
+                for (int i=0; i< polygonsCCW.Count; ++i)
                 {
-                    if (polygon.IsHoleInside(hole))
+                    if (polygon.IsHoleInside(polygonsCCW[i]))
                     {
-                        holes.Add(hole);
-                        Debug.Log("Found hole");
-                    }
-                    else
-                    {
-                        Debug.Log("no hole");
-                    }
-                }
-
-                //find bridges to combine holes
-                bool changed = true;
-                while (changed)
-                {
-                    changed = false;
-                    foreach (Polygon hole in holes)
-                    {
-                        if (polygon.CombineHole(hole, polygonsCW))
-                        {
-                            //changed = true;
-                            for (int i=0, j=polygon.nodes.Count-1;i<polygon.nodes.Count;j=i++)
-                            {
-                                Vector3 v1 = transform.TransformPoint(newVertices[polygon.nodes[i].index] + i * 0.01f * planeNormal);
-                                Vector3 v2 = transform.TransformPoint(newVertices[polygon.nodes[j].index] + j * 0.01f * planeNormal);
-                                Debug.DrawLine(v1, v2, Color.red);
-                            }
-                        }
+                        Debug.Log("Hole");
+                        polygonsCCW[i].nodes.Reverse();
+                        holes.Add(polygonsCCW[i].ToPoints());
+                        nodes.AddRange(polygonsCCW[i].nodes);
+                        polygonsCCW.RemoveAt(i);
+                        --i;
                     }
                 }
 
-                //remove holes from polygonCCW
-                foreach (Polygon hole in holes)
+                //add triangles
+                List<Vector2> points = polygon.ToPoints();
+                List<int> indices = new();
+                Triangulation.Triangulate(points, holes, out indices);
+
+                for (int i = 0; i < indices.Count; i += 3)
                 {
-                    polygonsCW.Remove(hole);
+                    newTriangles.Add(newVertices.Count + indices[i]);
+                    newTriangles.Add(newVertices.Count + indices[i+1]);
+                    newTriangles.Add(newVertices.Count + indices[i+2]);
+                }
+
+                //add points
+                foreach (PolygonNode node in nodes)
+                {
+                    newVertices.Add(newVertices[node.index]);
+                    newUVs.Add(Vector2.zero);
+                    newNormals.Add(-planeNormal);
                 }
             }
 
-            //add triangulation of polygon to mesh
+            /*//add triangulation of polygon to mesh
             foreach (Polygon polygon in polygonsCCW)
             {
                 //get triangulation of points
@@ -491,7 +485,7 @@ public class Sliceable : MonoBehaviour
                     newUVs.Add(Vector2.zero);
                     newNormals.Add(-planeNormal);
                 }
-            }
+            }*/
         }
 
         //create new mesh
