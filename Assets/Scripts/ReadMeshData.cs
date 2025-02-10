@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Collections;
@@ -9,7 +10,9 @@ public struct VertexData
 {
     public float3 position;
     public float3 normal;
+    public float4 tangent;
     public float2 uv0;
+    public float2 uv1;
 }
 
 namespace ReadMesh
@@ -138,6 +141,12 @@ namespace ReadMesh
             JobHandle populateHandle = populateJob.Schedule(vertexCount, 64, allAttributesHandle);
 
             return populateHandle;
+        }
+
+        public static void ReadMeshDataStream(Mesh.MeshData meshData, out NativeArray<VertexData> vertices, NativeArray<ushort> indices)
+        {
+            vertices = meshData.GetVertexData<VertexData>();
+            meshData.GetIndexData<ushort>().CopyTo(indices);
         }
     }
 }

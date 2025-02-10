@@ -8,6 +8,7 @@ using System.Drawing;
 using Unity.Burst;
 using System;
 using System.Diagnostics;
+using UnityEngine.Rendering;
 
 public class Slicer : MonoBehaviour
 {
@@ -50,22 +51,24 @@ public class Slicer : MonoBehaviour
 
         }
 
-        Mesh.MeshDataArray meshDataArray = Mesh.AcquireReadOnlyMeshData(meshes);
+        var meshDataArray = Mesh.AcquireReadOnlyMeshData(meshes);
+        var newMeshDataArray = Mesh.AllocateWritableMeshData(2*meshDataArray.Length);
 
+        NativeArray<JobHandle> handles = new NativeArray<JobHandle>(meshDataArray.Length,Allocator.TempJob);
         for (int i = 0; i < meshDataArray.Length; i++)
         {
             //read data from mesh
             Mesh.MeshData data = meshDataArray[i];
             int vertexCount = data.vertexCount;
             int indexCount = data.GetSubMesh(0).indexCount;
-            NativeArray<VertexData> vertices = new NativeArray<VertexData>(vertexCount, Allocator.Persistent);
-            NativeArray<int> indices = new NativeArray<int>(indexCount, Allocator.Persistent);
 
             //read in mech data
-            JobHandle readHandle = MeshInfo.ProcessMeshData(data, vertices, indices);
+            NativeArray<VertexData> vertices = new NativeArray<VertexData>(vertexCount, Allocator.TempJob);
+            NativeArray<int> indices = new NativeArray<int>(indexCount, Allocator.TempJob);
+            JobHandle parseMeshHandle = MeshInfo.ProcessMeshData(data, vertices, indices);
 
             //classify Vertices
-            var vertexSides = new NativeArray<bool>(vertexCount, Allocator.Persistent);
+            var vertexSides = new NativeArray<bool>(vertexCount, Allocator.TempJob);
             var classifyVerticesJob = new ClassifyVerticesJob
             {
                 vertices = vertices,
@@ -73,13 +76,13 @@ public class Slicer : MonoBehaviour
                 planePoint = planePoints[i],
                 planeNormal = planeNormals[i],
             };
-            var classifyVerticesHandle = classifyVerticesJob.Schedule(vertexCount, 64, readHandle);
+            var classifyVerticesHandle = classifyVerticesJob.Schedule(vertexCount, 64, parseMeshHandle);
 
 
             //classify triangles
             int trianglCount = indices.Length / 3;
-            var TriangleType = new NativeArray<int>(trianglCount, Allocator.Persistent);
-            var splitEdges = new NativeParallelHashMap<Edge, VertexData>(trianglCount,Allocator.Persistent);
+            var TriangleType = new NativeArray<int>(trianglCount, Allocator.TempJob);
+            var splitEdges = new NativeParallelHashMap<Edge, VertexData>(trianglCount*3,Allocator.TempJob);
             var classifyTrianglesJob = new ClassifyTrianglesJob
             {
                 vertices = vertices,
@@ -93,11 +96,12 @@ public class Slicer : MonoBehaviour
             var classifyTrianglesHandle = classifyTrianglesJob.Schedule(trianglCount, 64, classifyVerticesHandle);
 
 
+
             //split mesh
-            var outputVertices1 = new NativeList<VertexData>(vertexCount, Allocator.Persistent);
-            var outputVertices2 = new NativeList<VertexData>(vertexCount, Allocator.Persistent);
-            var outputIndices1 = new NativeList<int>(indices.Length, Allocator.Persistent);
-            var outputIndices2 = new NativeList<int>(indices.Length, Allocator.Persistent);
+            var outputVertices1 = new NativeList<VertexData>(vertexCount + 2 * trianglCount, Allocator.TempJob);
+            var outputVertices2 = new NativeList<VertexData>(vertexCount + 2 * trianglCount, Allocator.TempJob);
+            var outputIndices1 = new NativeList<int>(3 * indices.Length, Allocator.TempJob);
+            var outputIndices2 = new NativeList<int>(3 * indices.Length, Allocator.TempJob);
             var seperateMeshJob = new SeperateMeshJob
             {
                 vertices = vertices,
@@ -111,25 +115,44 @@ public class Slicer : MonoBehaviour
                 outputIndices2 = outputIndices2,
             };
             var seperateMeshHandle = seperateMeshJob.Schedule(classifyTrianglesHandle);
+            splitEdges.Dispose(seperateMeshHandle);
 
-            seperateMeshHandle.Complete();
 
 
-            foreach(var vertex in outputVertices1)
+            //create new meshes
+            Mesh.MeshData data1 = newMeshDataArray[i * 2];
+            Mesh.MeshData data2 = newMeshDataArray[i * 2 + 1];
+            MeshAssignJob meshAssignJob1 = new MeshAssignJob
             {
-                UnityEngine.Debug.DrawLine(vertex.position, vertex.position + vertex.normal);
-            }
+                data = data1,
+                vertices = outputVertices1,
+                indices = outputIndices1
+            };
+            MeshAssignJob meshAssignJob2 = new MeshAssignJob
+            {
+                data = data2,
+                vertices = outputVertices2,
+                indices = outputIndices2
+            };
+            JobHandle meshAssignHandle1 = meshAssignJob1.Schedule(seperateMeshHandle);
+            outputVertices1.Dispose(meshAssignHandle1);
+            outputIndices1.Dispose(meshAssignHandle1);
+            JobHandle meshAssignHandle2 = meshAssignJob2.Schedule(seperateMeshHandle);
+            outputVertices2.Dispose(meshAssignHandle2);
+            outputIndices2.Dispose(meshAssignHandle2);
+            JobHandle meshAssignHndle = JobHandle.CombineDependencies(meshAssignHandle1, meshAssignHandle2);
 
-
-            splitEdges.Dispose();
-            outputVertices1.Dispose();
-            outputVertices2.Dispose();
-            outputIndices1.Dispose();
-            outputIndices2.Dispose();
-
+            handles[i] = meshAssignHndle;
         }
 
-        
+        JobHandle.CompleteAll(handles);
+
+        List<Mesh> newMeshes = new List<Mesh>();
+        for (int i = 0; i < newMeshDataArray.Length; i++) newMeshes.Add(new Mesh());
+        Mesh.ApplyAndDisposeWritableMeshData(newMeshDataArray, newMeshes);
+
+        newMeshes[0].RecalculateBounds();
+        GameObject.Find("Empty").GetComponent<MeshFilter>().mesh = newMeshes[0];
     }
 
 
@@ -150,7 +173,7 @@ public class Slicer : MonoBehaviour
         {
             float3 offset = vertices[index].position - planePoint;
             float dotProduct = math.dot(planeNormal, offset);
-            vertexSides[index] = dotProduct > 0.00001;
+            vertexSides[index] = dotProduct > 0;
         }
     }
 
@@ -163,7 +186,8 @@ public class Slicer : MonoBehaviour
 
         public bool Equals(Edge other)
         {
-            return index1 == other.index1 && index2 == other.index2;
+            return (index1 == other.index1 && index2 == other.index2) ||
+                (index2 == other.index1 && index1 == other.index2);
         }
 
         public override int GetHashCode()
@@ -172,8 +196,8 @@ public class Slicer : MonoBehaviour
             {
                 // Using a hash combining technique
                 int hash = 17;
-                hash = hash * 31 + index1;
-                hash = hash * 31 + index2;
+                hash = hash * 31 + (index1 * index2);
+                hash = hash * 31 + (index1 + index2);
                 return hash;
             }
         }
@@ -303,7 +327,7 @@ public class Slicer : MonoBehaviour
                 
 
                 Edge edge1to3 = new Edge { index1 = vertex1, index2 = vertex3 };
-                t = EdgePortion(vertices[vertex1].position, vertices[vertex2].position, planePoint, planeNormal);
+                t = EdgePortion(vertices[vertex1].position, vertices[vertex3].position, planePoint, planeNormal);
                 splitEdges.TryAdd(edge1to3, new VertexData
                 {
                     position = EdgeIntercept(vertices[vertex1].position, vertices[vertex3].position, t),
@@ -313,6 +337,8 @@ public class Slicer : MonoBehaviour
             }
         }
     }
+
+
 
 
 
@@ -333,23 +359,22 @@ public class Slicer : MonoBehaviour
         public void Execute()
         {
             // Create mapping of original indices to new output indices with extra capacity to reduce collisions
-            NativeParallelHashMap<int, int> vertexMap1 = new NativeParallelHashMap<int, int>(vertices.Length * 2, Allocator.Temp);
-            NativeParallelHashMap<int, int> vertexMap2 = new NativeParallelHashMap<int, int>(vertices.Length * 2, Allocator.Temp);
-            NativeParallelHashMap<Edge, int> edgeMap1 = new NativeParallelHashMap<Edge, int>(splitEdges.Count() * 2, Allocator.Temp);
-            NativeParallelHashMap<Edge, int> edgeMap2 = new NativeParallelHashMap<Edge, int>(splitEdges.Count() * 2, Allocator.Temp);
+            NativeHashMap<int, int> vertexMap = new NativeHashMap<int, int>(vertices.Length * 2, Allocator.Temp);
+            NativeHashMap<Edge, int> edgeMap1 = new NativeHashMap<Edge, int>(splitEdges.Count() * 2, Allocator.Temp);
+            NativeHashMap<Edge, int> edgeMap2 = new NativeHashMap<Edge, int>(splitEdges.Count() * 2, Allocator.Temp);
 
             // Process original vertices
             for (int i = 0; i < vertices.Length; i++)
             {
                 if (vertexSides[i])
                 {
-                    vertexMap2[i] = outputVertices2.Length;
-                    outputVertices2.Add(vertices[i]);
+                    vertexMap.TryAdd(i, outputVertices2.Length);
+                    outputVertices2.AddNoResize(vertices[i]);
                 }
                 else
                 {
-                    vertexMap1[i] = outputVertices1.Length;
-                    outputVertices1.Add(vertices[i]);
+                    vertexMap.TryAdd(i, outputVertices1.Length);
+                    outputVertices1.AddNoResize(vertices[i]);
                 }
             }
 
@@ -358,21 +383,106 @@ public class Slicer : MonoBehaviour
             NativeArray<VertexData> splitEdgeValues = splitEdges.GetValueArray(Allocator.Temp);
             for (int i = 0; i < splitEdgeValues.Length; i++)
             {
-                edgeMap1[splitEdgeKeys[i]] = outputVertices1.Length;
-                edgeMap2[splitEdgeKeys[i]] = outputVertices2.Length;
-                outputVertices1.Add(splitEdgeValues[i]);
-                outputVertices2.Add(splitEdgeValues[i]);
+                edgeMap1.TryAdd(splitEdgeKeys[i], outputVertices1.Length);
+                edgeMap2.TryAdd(splitEdgeKeys[i], outputVertices2.Length);
+                outputVertices1.AddNoResize(splitEdgeValues[i]);
+                outputVertices2.AddNoResize(splitEdgeValues[i]);
             }
             splitEdgeKeys.Dispose();
             splitEdgeValues.Dispose();
 
-            // --- TRIANGLE HANDLING LOGIC WOULD GO HERE ---
+            //add all triangles to each mesh
+            for (int i=0; i<triangleType.Length; i++)
+            {
+                int vertex1 = indices[i * 3];
+                int vertex2 = indices[i * 3 + 1];
+                int vertex3 = indices[i * 3 + 2];
+
+                int outputVertex1, outputVertex2, outputVertex3;
+                vertexMap.TryGetValue(vertex1, out outputVertex1);
+                vertexMap.TryGetValue(vertex2, out outputVertex2);
+                vertexMap.TryGetValue(vertex3, out outputVertex3);
+
+                int edgeVertex1to2_1, edgeVertex1to3_1;
+                edgeMap1.TryGetValue(new Edge { index1 = vertex1, index2 = vertex2 }, out edgeVertex1to2_1);
+                edgeMap1.TryGetValue(new Edge { index1 = vertex1, index2 = vertex3 }, out edgeVertex1to3_1);
+
+                int edgeVertex1to2_2, edgeVertex1to3_2;
+                edgeMap2.TryGetValue(new Edge { index1 = vertex1, index2 = vertex2 }, out edgeVertex1to2_2);
+                edgeMap2.TryGetValue(new Edge { index1 = vertex1, index2 = vertex3 }, out edgeVertex1to3_2);
+
+                switch (triangleType[i])
+                {
+                    case 0:
+                        outputIndices1.AddNoResize(outputVertex1);
+                        outputIndices1.AddNoResize(outputVertex2);
+                        outputIndices1.AddNoResize(outputVertex3);
+                        break;
+                    case 1:
+                        outputIndices2.AddNoResize(outputVertex1);
+                        outputIndices2.AddNoResize(edgeVertex1to2_2);
+                        outputIndices2.AddNoResize(edgeVertex1to3_2);
+
+                        outputIndices1.AddNoResize(edgeVertex1to2_1);
+                        outputIndices1.AddNoResize(outputVertex2);
+                        outputIndices1.AddNoResize(outputVertex3);
+
+                        outputIndices1.AddNoResize(edgeVertex1to2_1);
+                        outputIndices1.AddNoResize(outputVertex3);
+                        outputIndices1.AddNoResize(edgeVertex1to3_1);
+                        break;
+                    case 2:
+                        outputIndices1.AddNoResize(outputVertex1);
+                        outputIndices1.AddNoResize(edgeVertex1to2_1);
+                        outputIndices1.AddNoResize(edgeVertex1to3_1);
+
+                        outputIndices2.AddNoResize(edgeVertex1to2_2);
+                        outputIndices2.AddNoResize(outputVertex2);
+                        outputIndices2.AddNoResize(outputVertex3);
+
+                        outputIndices2.AddNoResize(edgeVertex1to2_2);
+                        outputIndices2.AddNoResize(outputVertex3);
+                        outputIndices2.AddNoResize(edgeVertex1to3_2);
+                        break;
+                    case 3:
+                        outputIndices2.AddNoResize(outputVertex1);
+                        outputIndices2.AddNoResize(outputVertex2);
+                        outputIndices2.AddNoResize(outputVertex3);
+                        break;
+                }
+            }
 
             // Dispose of hash maps
-            vertexMap1.Dispose();
-            vertexMap2.Dispose();
+            vertexMap.Dispose();
             edgeMap1.Dispose();
             edgeMap2.Dispose();
+        }
+    }
+    
+
+
+
+    struct MeshAssignJob : IJob
+    {
+        public Mesh.MeshData data;
+        [ReadOnly] public NativeList<VertexData> vertices;
+        [ReadOnly] public NativeList<int> indices;
+
+        public void Execute()
+        {
+            data.SetVertexBufferParams(vertices.Length,
+                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, 0),
+                new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, 0),
+                new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 0),
+                new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2, 0),
+                new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, 2, 0)
+            );
+            data.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
+
+            data.GetVertexData<VertexData>(0).CopyFrom(vertices.AsArray());
+            data.GetIndexData<int>().CopyFrom(indices.AsArray());
+            data.subMeshCount = 1;
+            data.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length));
         }
     }
 }
