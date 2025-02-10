@@ -269,10 +269,10 @@ namespace UnityEngine.ProBuilder
         {
             Material material = null;
 
-            if (GraphicsSettings.renderPipelineAsset != null)
+            if (GraphicsSettings.defaultRenderPipeline != null)
             {
 #if UNITY_2019_1_OR_NEWER
-                    material = GraphicsSettings.renderPipelineAsset.defaultMaterial;
+                    material = GraphicsSettings.defaultRenderPipeline.defaultMaterial;
 #else
                     material = GraphicsSettings.renderPipelineAsset.GetDefaultMaterial();
 #endif

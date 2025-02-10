@@ -1,156 +1,110 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Experimental.AI;
-
-
+using UnityEngine.ProBuilder;
+/*
+[BurstCompile]
 public struct PolygonNode
 {
-    public Vector2 pos; //2d position
-    public int index; //index from original vertice array (needed to reconstruction of triangulation
+    public float2 pos; // 2D position
+    public int index;  // Index from the original vertex array (needed for reconstruction)
 
-    public PolygonNode(Vector2 pos, int index)
+    public PolygonNode(float2 pos, int index)
     {
         this.pos = pos;
         this.index = index;
     }
 }
 
-
-
-public class Polygon
+[BurstCompile]
+public static class Polygon
 {
-    public List<PolygonNode> nodes;
-
-    public Polygon(List<Vector2> points, List<int> indexes)
+    [BurstCompile]
+    public static float3 GetOrthogonalVector(float3 v)
     {
-        if (points.Count != indexes.Count) return;
+        float3 orthogonal = math.abs(v.x) > math.abs(v.z)
+            ? new float3(-v.y, v.x, 0)
+            : new float3(0, -v.z, v.y);
+        return math.normalize(orthogonal);
+    }
 
-        nodes = new();
-        for (int i=0; i<points.Count; i++)
+
+
+    [BurstCompile]
+    public static void MakePolygon(
+    NativeList<int> loop,
+    NativeArray<float3> vertices,
+    float3 normal,
+    ref NativeList<PolygonNode> polygon)
+    {
+        //get components of 3d plane
+        float3 dir1 = GetOrthogonalVector(normal);
+        float3 dir2 = math.cross(normal, dir1);
+
+        polygon.Clear(); // Ensure it's empty before filling
+        for (int i = 0; i < loop.Length; i++)
         {
-            nodes.Add(new PolygonNode(points[i], indexes[i]));
+            int point = loop[i];
+            float3 pos = vertices[point];
+            float comp1 = math.dot(dir1, pos);
+            float comp2 = math.dot(dir2, pos);
+            polygon.Add(new PolygonNode(new float2(comp2, comp1), point));
         }
     }
 
-    public Polygon(List<PolygonNode> nodes)
+    [BurstCompile]
+    static float Cross(float2 a, float2 b) => a.x * b.y - a.y * b.x;
+
+    [BurstCompile]
+    public static bool DoLinesIntersect(float2 p1, float2 p2, float2 q1, float2 q2)
     {
-        this.nodes = nodes;
-    }
-
-    //return a list of vector2 points
-    public List<Vector2> ToPoints()
-    {
-        List<Vector2> points = new();
-        foreach (PolygonNode node in nodes)
-        {
-            points.Add(node.pos);
-        }
-        return points;
-    }
-
-
-
-
-
-    public static Vector3 GetOrthogonalVector(Vector3 v)
-    {
-        Vector3 orthogonal = Mathf.Abs(v.x) > Mathf.Abs(v.z) ?
-                new Vector3(-v.y, v.x, 0) :
-                new Vector3(0, -v.z, v.y);
-        orthogonal.Normalize();
-        return orthogonal;
-    }
-
-
-
-    //convert a 3d path into a 2d polygon
-    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vector3> vertices, Vector3 normal)
-    {
-        //Convert slice to 2D polygons and determine direction
-        Vector3 dir1 = GetOrthogonalVector(normal);
-        Vector3 dir2 = Vector3.Cross(normal, dir1);
-        List<Polygon> polygons = new();
-        foreach (List<int> loop in loops)
-        {
-            polygons.Add(MakePolygon(loop, vertices, dir1, dir2));
-        }
-        return polygons;
-    }
-
-
-    public static Polygon MakePolygon(List<int> loop,  List<Vector3> vertices, Vector3 dir1, Vector3 dir2)
-    {
-        //turn loops into 2d list
-        List<Vector2> polygon = new List<Vector2>();
-        foreach (int point in loop)
-        {
-            Vector3 pos = vertices[point];
-            float comp1 = Vector3.Dot(dir1, pos);
-            float comp2 = Vector3.Dot(dir2, pos);
-            polygon.Add(new Vector2(comp2, comp1));
-        }
-        return new Polygon(polygon, loop);
-    }
-
-
-
-    //determine whether two lines intersect
-    public static bool DoLinesIntersect(Vector2 p1, Vector2 p2, Vector2 q1, Vector2 q2)
-    {
-        float Cross(Vector2 a, Vector2 b) => a.x * b.y - a.y * b.x;
-
-        Vector2 r = p2 - p1;
-        Vector2 s = q2 - q1;
+        float2 r = p2 - p1;
+        float2 s = q2 - q1;
 
         float rxs = Cross(r, s);
-        Vector2 q1p1 = q1 - p1;
+        float2 q1p1 = q1 - p1;
 
-        if (Mathf.Approximately(rxs, 0f))
+        if (math.abs(rxs) < 1e-5f) // Almost zero, consider it parallel
         {
-            // Collinear case: check for overlap
-            if (Mathf.Approximately(Cross(q1p1, r), 0f))
+            if (math.abs(Cross(q1p1, r)) < 1e-5f) // Collinear case
             {
-                float t0 = Vector2.Dot(q1p1, r) / Vector2.Dot(r, r);
-                float t1 = t0 + Vector2.Dot(s, r) / Vector2.Dot(r, r);
+                float t0 = math.dot(q1p1, r) / math.dot(r, r);
+                float t1 = t0 + math.dot(s, r) / math.dot(r, r);
                 return (t0 >= 0 && t0 <= 1) || (t1 >= 0 && t1 <= 1);
             }
-            return false; // Parallel but not collinear
+            return false;
         }
 
         float t = Cross(q1p1, s) / rxs;
         float u = Cross(q1p1, r) / rxs;
 
-        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+        return (t >= 0 && t <= 1) && (u >= 0 && u <= 1);
     }
 
-
-
-    //check if a line intersects with a polygon
-    public bool DoesLineIntersect(Vector2 p1, Vector2 p2)
+    [BurstCompile]
+    public static bool DoesLineIntersect(NativeList<PolygonNode> polygon, float2 p1, float2 p2)
     {
-        for (int i=0, j=nodes.Count-1; i<nodes.Count; j=i++)
+        int count = polygon.Length;
+        for (int i = 0, j = count - 1; i < count; j = i++)
         {
-            Vector2 q1 = nodes[i].pos;
-            Vector2 q2 = nodes[j].pos;
-            if (DoLinesIntersect(p1, p2, q1, q2)) return true;
+            if (DoLinesIntersect(p1, p2, polygon[i].pos, polygon[j].pos))
+                return true;
         }
         return false;
     }
 
-
-
-    //determine whether a single point is encased within a polygon
-    public bool IsPointInside(Vector2 point)
+    [BurstCompile]
+    public static bool IsPointInside(NativeList<PolygonNode> polygon, float2 point)
     {
         int crossingNumber = 0;
-        int count = nodes.Count;
+        int count = polygon.Length;
 
         for (int i = 0, j = count - 1; i < count; j = i++)
         {
-            Vector2 v1 = nodes[i].pos;
-            Vector2 v2 = nodes[j].pos;
+            float2 v1 = polygon[i].pos;
+            float2 v2 = polygon[j].pos;
 
             if (((v1.y > point.y) != (v2.y > point.y)) &&
                 (point.x < (v2.x - v1.x) * (point.y - v1.y) / (v2.y - v1.y) + v1.x))
@@ -158,154 +112,32 @@ public class Polygon
                 crossingNumber++;
             }
         }
-        return (crossingNumber % 2) == 1; // Odd means inside, even means outside
+        return (crossingNumber & 1) == 1; // Odd means inside, even means outside
     }
 
-
-
-    //determine whether a hole is completely encased within a polygon
-    public bool IsHoleInside(Polygon hole)
+    [BurstCompile]
+    public static bool IsHoleInside(NativeList<PolygonNode> polygon, NativeList<PolygonNode> hole)
     {
-        foreach (PolygonNode node in hole.nodes)
+        for (int i = 0; i < hole.Length; i++)
         {
-            if (!IsPointInside(node.pos))
-            {
+            if (!IsPointInside(polygon, hole[i].pos))
                 return false;
-            }
         }
         return true;
     }
 
-
-
-    //Determine whether a Polygon is clockwise or counter-clockwise
-    public bool IsClockwise()
+    [BurstCompile]
+    public static bool IsClockwise(NativeList<PolygonNode> polygon)
     {
         float sum = 0;
-        int count = nodes.Count;
+        int count = polygon.Length;
         for (int i = 0, j = count - 1; i < count; j = i++)
         {
-            Vector2 v1 = nodes[i].pos;
-            Vector2 v2 = nodes[j].pos;
+            float2 v1 = polygon[i].pos;
+            float2 v2 = polygon[j].pos;
 
             sum += (v2.x - v1.x) * (v2.y + v1.y);
         }
-
-        return sum > 0; // True if clockwise, False if counter-clockwise
+        return sum > 0;
     }
-
-
-
-
-    //attepts to combine a hole into a polygon by checking bridge compatibility
-    public bool CombineHole(Polygon hole, List<Polygon> allHoles)
-    {
-        //create list of potential bridges
-        List<(float sqDist, int polyIndex, int holeIndex)> bridges = new();
-        for (int i=0; i<nodes.Count; ++i)
-        {
-            for (int j=0; j<hole.nodes.Count; ++j)
-            {
-                bridges.Add((Vector2.SqrMagnitude(nodes[i].pos - hole.nodes[j].pos), i, j));
-            }
-        }
-
-        //sort potential bridges
-        bridges.Sort((x, y) => x.sqDist.CompareTo(y.sqDist));
-
-        //look through bridges
-        foreach (var bridge in bridges)
-        {
-            Vector2 p1 = nodes[bridge.polyIndex].pos;
-            Vector2 p2 = hole.nodes[bridge.holeIndex].pos;
-
-            bool validBridge = true;
-
-            //check against this polygon
-            for (int i=0,j=nodes.Count-1; i<nodes.Count; j=i++)
-            {
-                if (bridge.polyIndex == i || bridge.polyIndex == j) continue;
-
-                Vector2 q1 = nodes[i].pos;
-                Vector2 q2 = nodes[j].pos;
-
-                if (DoLinesIntersect(p1,p2,q1,q2))
-                {
-                    validBridge = false; 
-                    break;
-                }
-            }
-            if (!validBridge) continue;
-
-            //check against this hole
-            for (int i = 0, j = hole.nodes.Count-1; i < hole.nodes.Count; j = i++)
-            {
-                if (bridge.holeIndex == i || bridge.holeIndex == j) continue;
-
-                Vector2 q1 = hole.nodes[i].pos;
-                Vector2 q2 = hole.nodes[j].pos;
-
-                if (DoLinesIntersect(p1, p2, q1, q2))
-                {
-                    validBridge = false;
-                    break;
-                }
-            }
-            if (!validBridge) continue;
-
-            //check against other holes
-            foreach (Polygon otherHole in allHoles)
-            {
-                if (otherHole == hole) continue;
-
-                for (int i = 0, j = otherHole.nodes.Count - 1; i < otherHole.nodes.Count; j = i++)
-                {
-                    Vector2 q1 = otherHole.nodes[i].pos;
-                    Vector2 q2 = otherHole.nodes[j].pos;
-
-                    if (DoLinesIntersect(p1, p2, q1, q2))
-                    {
-                        validBridge = false;
-                        break;
-                    }
-                }
-                if (!validBridge) break;
-            }
-
-            //check for bridge validity
-            if (validBridge)
-            {
-                MergeHole(hole, bridge.polyIndex, bridge.holeIndex);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-
-
-
-    void MergeHole(Polygon Hole, int polyIndex, int holeIndex)
-    {
-        List<PolygonNode> newPolygon = new();
-
-        // Add elements from list1 up to index1 (inclusive)
-        newPolygon.AddRange(nodes.GetRange(0, polyIndex + 1));
-
-        // Add elements from list2 starting from index2 and wrapping around
-        for (int i = holeIndex; i < Hole.nodes.Count; i++)
-        {
-            newPolygon.Add(Hole.nodes[i]);
-        }
-        for (int i = 0; i <= holeIndex; i++)
-        {
-            newPolygon.Add(Hole.nodes[i]);
-        }
-
-        // Add elements from list1 starting from index1 (inclusive) to the end
-        newPolygon.AddRange(nodes.GetRange(polyIndex, nodes.Count - polyIndex));
-
-        nodes = newPolygon;
-    }
-}
+}*/

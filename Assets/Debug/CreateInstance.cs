@@ -18,7 +18,7 @@ public class CreateInstance : MonoBehaviour
             meshFilter.transform.localScale = meshDebugInfo.objectScale;
             meshFilter.mesh = meshDebugInfo.mesh;
 
-            Slicer.MakeSlice.Invoke(meshDebugInfo.slicePosition, meshDebugInfo.sliceNormal);
+            //Slicer.MakeSlice.Invoke(meshDebugInfo.slicePosition, meshDebugInfo.sliceNormal);
         }
     }
 }
