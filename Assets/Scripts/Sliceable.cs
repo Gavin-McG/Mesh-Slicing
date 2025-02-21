@@ -4,17 +4,56 @@ using System.Linq;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.ProBuilder.MeshOperations;
+using UnityEngine.Rendering;
 
-[System.Serializable] enum EdgeFillMode { None, Simple, Triangulate }
+[System.Serializable] enum EdgeFillMode { None, Center, Triangulate }
 [System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
+
+public struct Triangle
+{
+    public int p1, p2, p3;
+    public int subMesh;
+
+    public Triangle(int p1, int p2, int p3, int subMesh)
+    {
+        this.p1 = p1;
+        this.p2 = p2;
+        this.p3 = p3;
+        this.subMesh = subMesh;
+    }
+
+    public void RotateCW()
+    {
+        int t = p1;
+        p1 = p3;
+        p3 = p2;
+        p2 = t;
+    }
+
+    public void RotateCCW()
+    {
+        int t = p1;
+        p1 = p2;
+        p2 = p3;
+        p3 = t;
+    }
+
+    public override string ToString()
+    {
+        return "(" + p1 + ", " + p2 + ", " + p3 + ")";
+    }
+}
 
 public class Sliceable : MonoBehaviour
 {
     [SerializeField] MeshFilter meshFilter;
     [SerializeField] MeshFilter emptyPrefab;
-    [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Simple;
+    [Space(10)]
+    [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Center;
     [SerializeField] MomentumMode momentumMode = MomentumMode.Simple;
-    [SerializeField] bool SaveNoLoop = false;
+    [Space(10)]
+    [SerializeField] Material sliceMaterial;
+    [SerializeField] bool hasSliceSubMesh = false;
 
     private void Awake()
     {
@@ -124,23 +163,73 @@ public class Sliceable : MonoBehaviour
         return loops;
     }
 
+    Triangle[] GetTriangles(Mesh mesh)
+    {
+        int[] indices = mesh.triangles;
+        int totalTriangles = indices.Length/3;
+        Triangle[] triangles = new Triangle[totalTriangles];
+
+        for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+        {
+            SubMeshDescriptor subMeshDescriptor = mesh.GetSubMesh(submesh);
+            int indexStart = subMeshDescriptor.indexStart / 3;
+            int indexEnd = indexStart + (subMeshDescriptor.indexCount / 3);
+
+            for (int i = indexStart; i < indexEnd; i++)
+            {
+                triangles[i] = new Triangle(indices[i*3+0], indices[i*3+1], indices[i*3+2], submesh);
+            }
+        }
+
+        return triangles;
+    }
+
+    public void AssignTrianglesToMesh(Mesh mesh, List<Triangle> triangles)
+    {
+        if (triangles.Count == 0) return;
+
+        // Determine the number of submeshes
+        int subMeshCount = triangles[triangles.Count - 1].subMesh + 1;
+        mesh.subMeshCount = subMeshCount;
+
+        // Prepare triangle lists for each submesh
+        List<List<int>> submeshTriangles = new List<List<int>>(subMeshCount);
+        for (int i = 0; i < subMeshCount; i++)
+            submeshTriangles.Add(new List<int>());
+
+        // Populate submesh triangle lists
+        foreach (var tri in triangles)
+        {
+            submeshTriangles[tri.subMesh].Add(tri.p1);
+            submeshTriangles[tri.subMesh].Add(tri.p2);
+            submeshTriangles[tri.subMesh].Add(tri.p3);
+        }
+
+        // Assign triangles to the mesh
+        for (int i = 0; i < subMeshCount; i++)
+        {
+            mesh.SetTriangles(submeshTriangles[i], i);
+        }
+    }
+
+
     Mesh GetMeshSlice(Mesh original, Vector3 planePoint, Vector3 planeNormal)
     {
         //values for first new mesh
-        Dictionary<int, int> vectorDict = new Dictionary<int, int>();
-        List<Vector3> newVertices = new List<Vector3>();
-        List<Vector3> newNormals = new List<Vector3>();
-        List<Vector2> newUVs = new List<Vector2>();
-        List<int> newTriangles = new List<int>();
+        Dictionary<int, int> vectorDict = new();
+        List<Vector3> newVertices = new ();
+        List<Vector3> newNormals = new();
+        List<Vector2> newUVs = new();
+        List<Triangle> newTriangles = new();
 
-        Dictionary<(int,int), int> cutPoints = new Dictionary<(int, int), int>();
-        List<(int,int)> cutEdges = new List<(int, int)>();
+        Dictionary<(int,int), int> cutPoints = new();
+        List<(int,int)> cutEdges = new();
 
         //get mesh data
         Vector3[] vertices = original.vertices;
         Vector3[] normals = original.normals;
         Vector2[] UVs = original.uv;
-        int[] triangles = original.triangles;
+        Triangle[] triangles = GetTriangles(original);
         
 
         //add points to dict
@@ -162,16 +251,15 @@ public class Sliceable : MonoBehaviour
         }
 
         //create new traingles from old triangles
-        for (int i = 0; i < triangles.Length; i += 3)
+        foreach (Triangle tri in triangles)
         {
-            int hasV1 = vectorDict.ContainsKey(triangles[i + 0]) ? 1 : 0;
-            int hasV2 = vectorDict.ContainsKey(triangles[i + 1]) ? 1 : 0;
-            int hasV3 = vectorDict.ContainsKey(triangles[i + 2]) ? 1 : 0;
+            int hasV1 = vectorDict.ContainsKey(tri.p1) ? 1 : 0;
+            int hasV2 = vectorDict.ContainsKey(tri.p2) ? 1 : 0;
+            int hasV3 = vectorDict.ContainsKey(tri.p3) ? 1 : 0;
 
             int scenerio = (hasV3 << 2) + (hasV2 << 1) + (hasV1 << 0);
 
             int count = 0;
-            int v1 = 0, v2 = 0, v3 = 0;
             switch (scenerio)
             {
                 case 0:
@@ -181,161 +269,147 @@ public class Sliceable : MonoBehaviour
                 case 1:
                     //only v1 in slice
                     count = 1;
-                    v1 = triangles[i + 0];
-                    v2 = triangles[i + 1];
-                    v3 = triangles[i + 2];
                     break;
                 case 2:
                     //only v2 in slice
                     count = 1;
-                    v1 = triangles[i + 1];
-                    v2 = triangles[i + 2];
-                    v3 = triangles[i + 0];
+                    tri.RotateCCW();
                     break;
                 case 3:
                     //v1 and v2 in slice
                     count = 2;
-                    v1 = triangles[i + 2];
-                    v2 = triangles[i + 0];
-                    v3 = triangles[i + 1];
+                    tri.RotateCW();
                     break;
                 case 4:
                     //only v3 in slice
                     count = 1;
-                    v1 = triangles[i + 2];
-                    v2 = triangles[i + 0];
-                    v3 = triangles[i + 1];
+                    tri.RotateCW();
                     break;
                 case 5:
                     //v1 and v3 in slice
                     count = 2;
-                    v1 = triangles[i + 1];
-                    v2 = triangles[i + 2];
-                    v3 = triangles[i + 0];
+                    tri.RotateCCW();
                     break;
                 case 6:
                     //v2 and v3 in slice
                     count = 2;
-                    v1 = triangles[i + 0];
-                    v2 = triangles[i + 1];
-                    v3 = triangles[i + 2];
                     break;
                 case 7:
                     //all vertices in slice
                     count = 3;
-                    v1 = triangles[i + 0];
-                    v2 = triangles[i + 1];
-                    v3 = triangles[i + 2];
                     break;
             }
 
             //add new geometry
-            int newPoint1=0, newPoint2=0;
+            int newPoint1, newPoint2;
             switch (count)
             {
                 case 0:
                     continue;
                 case 1:
                     //get intercept point 1
-                    if (cutPoints.ContainsKey((v1, v2)))
+                    if (cutPoints.ContainsKey((tri.p1, tri.p2)))
                     {
                         //get existing point
-                        newPoint1 = cutPoints[(v1, v2)];
+                        newPoint1 = cutPoints[(tri.p1, tri.p2)];
                     }
                     else
                     {
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v2], t));
-                        newUVs.Add(EdgeUV(UVs[v1], UVs[v2], t));
-                        newNormals.Add(EdgeNormal(normals[v1], normals[v2], t));
+                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p2], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p2], t));
+                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p2], t));
+                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p2], t));
 
-                        cutPoints.Add((v1, v2), newPoint1);
+                        cutPoints.Add((tri.p1, tri.p2), newPoint1);
                     }
 
                     //get intercept point 2
-                    if (cutPoints.ContainsKey((v1, v3)))
+                    if (cutPoints.ContainsKey((tri.p1, tri.p3)))
                     {
                         //get existing point
-                        newPoint2 = cutPoints[(v1, v3)];
+                        newPoint2 = cutPoints[(tri.p1, tri.p3)];
                     }
                     else
                     {
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v3], t));
-                        newUVs.Add(EdgeUV(UVs[v1], UVs[v3], t));
-                        newNormals.Add(EdgeNormal(normals[v1], normals[v3], t));
+                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p3], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p3], t));
+                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p3], t));
+                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p3], t));
 
-                        cutPoints.Add((v1, v3), newPoint2);
+                        cutPoints.Add((tri.p1, tri.p3), newPoint2);
                     }
 
                     //add triangle to slice
-                    newTriangles.AddRange(new int[] { vectorDict[v1], newPoint1, newPoint2});
+                    newTriangles.Add(new Triangle(vectorDict[tri.p1], newPoint1, newPoint2, tri.subMesh));
                     //add new edge to list
                     cutEdges.Add((newPoint1, newPoint2));
 
                     break;
                 case 2:
                     //get intercept point 1
-                    if (cutPoints.ContainsKey((v1, v2)))
+                    if (cutPoints.ContainsKey((tri.p1, tri.p2)))
                     {
                         //get existing point
-                        newPoint1 = cutPoints[(v1, v2)];
+                        newPoint1 = cutPoints[(tri.p1, tri.p2)];
                     }
                     else
                     {
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[v1], vertices[v2], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v2], t));
-                        newUVs.Add(EdgeUV(UVs[v1], UVs[v2], t));
-                        newNormals.Add(EdgeNormal(normals[v1], normals[v2], t));
+                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p2], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p2], t));
+                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p2], t));
+                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p2], t));
 
-                        cutPoints.Add((v1, v2), newPoint1);
+                        cutPoints.Add((tri.p1, tri.p2), newPoint1);
                     }
 
                     //get intercept point 2
-                    if (cutPoints.ContainsKey((v1, v3)))
+                    if (cutPoints.ContainsKey((tri.p1, tri.p3)))
                     {
                         //get existing point
-                        newPoint2 = cutPoints[(v1, v3)];
+                        newPoint2 = cutPoints[(tri.p1, tri.p3)];
                     }
                     else
                     {
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[v1], vertices[v3], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[v1], vertices[v3], t));
-                        newUVs.Add(EdgeUV(UVs[v1], UVs[v3], t));
-                        newNormals.Add(EdgeNormal(normals[v1], normals[v3], t));
+                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p3], planePoint, planeNormal);
+                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p3], t));
+                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p3], t));
+                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p3], t));
 
-                        cutPoints.Add((v1, v3), newPoint2);
+                        cutPoints.Add((tri.p1, tri.p3), newPoint2);
                     }
 
                     //add trapezoid to slice
-                    newTriangles.AddRange(new int[] { newPoint1, vectorDict[v2], vectorDict[v3] });
-                    newTriangles.AddRange(new int[] { newPoint1, vectorDict[v3], newPoint2 });
+                    newTriangles.Add(new Triangle(newPoint1, vectorDict[tri.p2], vectorDict[tri.p3], tri.subMesh));
+                    newTriangles.Add(new Triangle(newPoint1, vectorDict[tri.p3], newPoint2, tri.subMesh));
                     //add new edge to list
                     cutEdges.Add((newPoint2, newPoint1));
 
                     break;
                 case 3:
                     //add traingle to slice
-                    newTriangles.AddRange(new int[] { vectorDict[v1], vectorDict[v2], vectorDict[v3] });
+                    newTriangles.Add(new Triangle(vectorDict[tri.p1], vectorDict[tri.p2], vectorDict[tri.p3], tri.subMesh));
                     break;
             }
         }
 
 
+        //decide what submesh to put slice triangles in
+        int subMeshCount = hasSliceSubMesh ? original.subMeshCount : original.subMeshCount+1;
+        int sliceSubmesh = subMeshCount - 1;
 
-        if (edgeFillMode == EdgeFillMode.Simple)
+        if (edgeFillMode == EdgeFillMode.Center)
         {
             //find center point of new points on edge
             if (cutEdges.Count > 0)
@@ -356,7 +430,7 @@ public class Sliceable : MonoBehaviour
                 for (int i = 0; i < cutEdges.Count; ++i)
                 {
                     //new traingle
-                    newTriangles.AddRange(new int[] { newVertices.Count + 1, newVertices.Count, centerPointIndex });
+                    newTriangles.Add(new Triangle(newVertices.Count + 1, newVertices.Count, centerPointIndex, sliceSubmesh));
 
                     //new points
                     newVertices.Add(newVertices[cutEdges[i].Item1]);
@@ -452,9 +526,7 @@ public class Sliceable : MonoBehaviour
 
                 for (int i = 0; i < indices.Count; i += 3)
                 {
-                    newTriangles.Add(newVertices.Count + indices[i]);
-                    newTriangles.Add(newVertices.Count + indices[i+1]);
-                    newTriangles.Add(newVertices.Count + indices[i+2]);
+                    newTriangles.Add(new Triangle(newVertices.Count + indices[i], newVertices.Count + indices[i + 1], newVertices.Count + indices[i + 2], sliceSubmesh));
                 }
 
                 //add points
@@ -465,27 +537,6 @@ public class Sliceable : MonoBehaviour
                     newNormals.Add(-planeNormal);
                 }
             }
-
-            /*//add triangulation of polygon to mesh
-            foreach (Polygon polygon in polygonsCCW)
-            {
-                //get triangulation of points
-                List<Vector2> points = polygon.ToPoints();
-                List<(int, int, int)> edgeTriangles = Triangulate.TriangulatePolygon(points);
-                foreach ((int, int, int) triangle in edgeTriangles)
-                {
-                    newTriangles.Add(newVertices.Count + triangle.Item2);
-                    newTriangles.Add(newVertices.Count + triangle.Item1);
-                    newTriangles.Add(newVertices.Count + triangle.Item3);
-                }
-
-                foreach (PolygonNode node in polygon.nodes)
-                {
-                    newVertices.Add(newVertices[node.index]);
-                    newUVs.Add(Vector2.zero);
-                    newNormals.Add(-planeNormal);
-                }
-            }*/
         }
 
         //create new mesh
@@ -493,7 +544,7 @@ public class Sliceable : MonoBehaviour
         slice.SetVertices(newVertices);
         slice.SetNormals(newNormals);
         slice.SetUVs(0, newUVs);
-        slice.SetTriangles(newTriangles, 0);
+        AssignTrianglesToMesh(slice, newTriangles);
         slice.RecalculateBounds();
 
         return slice;
@@ -519,12 +570,27 @@ public class Sliceable : MonoBehaviour
             collider.sharedMesh = mesh;
         }
 
-        //set mesh renderer
+        //set mesh renderer materials
         MeshRenderer oldRenderer = gameObject.GetComponent<MeshRenderer>();
         MeshRenderer newRenderer = newFilter.GetComponent<MeshRenderer>();
         if (oldRenderer != null && newRenderer != null)
         {
-            newRenderer.material = oldRenderer.material;
+            Material[] currentMaterials = oldRenderer.materials;
+            Material[] newMaterials = new Material[currentMaterials.Length + (hasSliceSubMesh ? 0 : 1)];
+
+            // Copy existing materials
+            for (int i = 0; i < currentMaterials.Length; i++)
+            {
+                newMaterials[i] = currentMaterials[i];
+            }
+
+            if (!hasSliceSubMesh)
+            {
+                // Add the new material
+                newMaterials[newMaterials.Length - 1] = sliceMaterial;
+            }
+
+            newRenderer.materials = newMaterials;
         }
 
         //set rigidbody

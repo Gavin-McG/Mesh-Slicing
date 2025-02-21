@@ -151,4 +151,4 @@ MonoBehaviour:
   emptyPrefab: {fileID: 676693536727445086}
   edgeFillMode: 1
   momentumMode: 1
-  SaveNoLoop: 1
+  hasSliceSubMesh: 1
