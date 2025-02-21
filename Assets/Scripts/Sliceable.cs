@@ -7,7 +7,9 @@ using UnityEngine.ProBuilder.MeshOperations;
 using UnityEngine.Rendering;
 
 [System.Serializable] enum EdgeFillMode { None, Center, Triangulate }
+[System.Serializable] enum EdgeUVMode { Zero, Proj }
 [System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
+
 
 public struct Triangle
 {
@@ -50,6 +52,7 @@ public class Sliceable : MonoBehaviour
     [SerializeField] MeshFilter emptyPrefab;
     [Space(10)]
     [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Center;
+    [SerializeField] EdgeUVMode edgeUVMode = EdgeUVMode.Proj;
     [SerializeField] MomentumMode momentumMode = MomentumMode.Simple;
     [Space(10)]
     [SerializeField] Material sliceMaterial;
@@ -483,7 +486,7 @@ public class Sliceable : MonoBehaviour
             List<List<int>> loops = ConnectionsToLoops(direct);
 
             //get 2d polygons from loops
-            List<Polygon> polygons = Polygon.MakePolygons(loops, newVertices, planeNormal);
+            List<Polygon> polygons = Polygon.MakePolygons(loops, newVertices, planeNormal, edgeUVMode==EdgeUVMode.Proj);
 
             //divide polygons by direction 
             List<Polygon> polygonsCW = new();
@@ -533,7 +536,7 @@ public class Sliceable : MonoBehaviour
                 foreach (PolygonNode node in nodes)
                 {
                     newVertices.Add(newVertices[node.index]);
-                    newUVs.Add(Vector2.zero);
+                    newUVs.Add(edgeUVMode==EdgeUVMode.Zero ? Vector2.zero : node.pos);
                     newNormals.Add(-planeNormal);
                 }
             }

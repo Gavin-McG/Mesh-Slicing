@@ -66,7 +66,7 @@ public class Polygon
 
 
     //convert a 3d path into a 2d polygon
-    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vector3> vertices, Vector3 normal)
+    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vector3> vertices, Vector3 normal, bool clamp=false)
     {
         //Convert slice to 2D polygons and determine direction
         Vector3 dir1 = GetOrthogonalVector(normal);
@@ -76,6 +76,39 @@ public class Polygon
         {
             polygons.Add(MakePolygon(loop, vertices, dir1, dir2));
         }
+
+        //clamp values between 0 and 1
+        if (clamp)
+        {
+            //find bounding box
+            float minX = polygons[0].nodes[0].pos.x, maxX = polygons[0].nodes[0].pos.x;
+            float minY = polygons[0].nodes[0].pos.y, maxY = polygons[0].nodes[0].pos.y;
+            foreach (Polygon polygon in polygons)
+            {
+                foreach(PolygonNode node in polygon.nodes)
+                {
+                    minX = Mathf.Min(minX, node.pos.x);
+                    maxX = Mathf.Max(maxX, node.pos.x);
+                    minY = Mathf.Min(minY, node.pos.y);
+                    maxY = Mathf.Max(maxY, node.pos.y);
+                }
+            }
+
+            //modify loops
+            for (int p = 0; p < polygons.Count; p++)
+            {
+                for (int i = 0; i < polygons[p].nodes.Count; i++)
+                {
+                    PolygonNode node = polygons[p].nodes[i];
+                    node.pos.x -= minX;
+                    node.pos.y -= minY;
+                    node.pos.x /= (maxX - minX);
+                    node.pos.y /= (maxY - minY);
+                    polygons[p].nodes[i] = node;
+                }
+            }
+        }
+
         return polygons;
     }
 
