@@ -10,42 +10,6 @@ using UnityEngine.Rendering;
 [System.Serializable] enum EdgeUVMode { Zero, Proj }
 [System.Serializable] enum MomentumMode { Reset, Simple, Advanced }
 
-
-public struct Triangle
-{
-    public int p1, p2, p3;
-    public int subMesh;
-
-    public Triangle(int p1, int p2, int p3, int subMesh)
-    {
-        this.p1 = p1;
-        this.p2 = p2;
-        this.p3 = p3;
-        this.subMesh = subMesh;
-    }
-
-    public void RotateCW()
-    {
-        int t = p1;
-        p1 = p3;
-        p3 = p2;
-        p2 = t;
-    }
-
-    public void RotateCCW()
-    {
-        int t = p1;
-        p1 = p2;
-        p2 = p3;
-        p3 = t;
-    }
-
-    public override string ToString()
-    {
-        return "(" + p1 + ", " + p2 + ", " + p3 + ")";
-    }
-}
-
 public class Sliceable : MonoBehaviour
 {
     [SerializeField] MeshFilter meshFilter;
@@ -63,79 +27,6 @@ public class Sliceable : MonoBehaviour
         meshFilter = GetComponent<MeshFilter>();
 
         Slicer.MakeSlice.AddListener(Slice);
-    }
-
-    bool InSlice(Vector3 point, Vector3 planePoint, Vector3 planeNormal)
-    {
-        Vector3 offset = point - planePoint;
-        float dotProduct = Vector3.Dot(offset, planeNormal);
-        return dotProduct > 0.00001;
-    }
-
-    List<Vector3> GetCorners(Bounds bounds)
-    {
-        Vector3 center = bounds.center;
-        Vector3 extents = bounds.extents;
-
-        // Calculate corners relative to the center
-        return new List<Vector3>
-        {
-            center + new Vector3(-extents.x, -extents.y, -extents.z), // Bottom-back-left
-            center + new Vector3(extents.x, -extents.y, -extents.z),  // Bottom-back-right
-            center + new Vector3(-extents.x, -extents.y, extents.z),  // Bottom-front-left
-            center + new Vector3(extents.x, -extents.y, extents.z),   // Bottom-front-right
-            center + new Vector3(-extents.x, extents.y, -extents.z),  // Top-back-left
-            center + new Vector3(extents.x, extents.y, -extents.z),   // Top-back-right
-            center + new Vector3(-extents.x, extents.y, extents.z),   // Top-front-left
-            center + new Vector3(extents.x, extents.y, extents.z)     // Top-front-right
-        };
-    }
-
-    bool IntersectsBounds(Bounds bounds, Vector3 planePoint, Vector3 planeNormal)
-    {
-        //get corners of bounds
-        List<Vector3> boundsCorners = GetCorners(bounds);
-
-        //count points on positive side of bounds
-        int s = 0;
-        for (int i=0; i<boundsCorners.Count; i++)
-        {
-            s += Vector3.Dot(boundsCorners[i]-planePoint, planeNormal)>0?1:0;
-        }
-
-        return (s != 0 && s != boundsCorners.Count);
-    }
-
-    float EdgePortion(Vector3 point1, Vector3 point2, Vector3 planePoint, Vector3 planeNormal)
-    {
-        Vector3 lineDir = point2 - point1;
-        float dotProduct = Vector3.Dot(planeNormal, lineDir);
-        float t = Vector3.Dot(planePoint - point1, planeNormal) / dotProduct;
-
-        t = Math.Clamp(t, 0.0f, 1.0f);
-
-        return t;
-    }
-
-    Vector3 EdgeIntercept(Vector3 point1, Vector3 point2, float t)
-    {
-        return point1 + t * (point2 - point1);
-    }
-    Vector2 EdgeUV(Vector2 uv1,  Vector2 uv2, float t)
-    {
-        return uv1 + t * (uv2 - uv1);
-    }
-    Vector3 EdgeNormal(Vector3 normal1, Vector3 normal2, float t)
-    {
-        return normal1 + t * (normal2 - normal1);
-    }
-
-    float epsilon = 0.0001f;
-    public bool VectorsClose(Vector3 v1, Vector3 v2)
-    {
-        return Mathf.Abs(v1.x - v2.x) < epsilon &&
-               Mathf.Abs(v1.y - v2.y) < epsilon &&
-               Mathf.Abs(v1.z - v2.z) < epsilon;
     }
 
     List<List<int>> ConnectionsToLoops(Dictionary<int, int> direct)
@@ -166,84 +57,28 @@ public class Sliceable : MonoBehaviour
         return loops;
     }
 
-    Triangle[] GetTriangles(Mesh mesh)
-    {
-        int[] indices = mesh.triangles;
-        int totalTriangles = indices.Length/3;
-        Triangle[] triangles = new Triangle[totalTriangles];
 
-        for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
-        {
-            SubMeshDescriptor subMeshDescriptor = mesh.GetSubMesh(submesh);
-            int indexStart = subMeshDescriptor.indexStart / 3;
-            int indexEnd = indexStart + (subMeshDescriptor.indexCount / 3);
-
-            for (int i = indexStart; i < indexEnd; i++)
-            {
-                triangles[i] = new Triangle(indices[i*3+0], indices[i*3+1], indices[i*3+2], submesh);
-            }
-        }
-
-        return triangles;
-    }
-
-    public void AssignTrianglesToMesh(Mesh mesh, List<Triangle> triangles)
-    {
-        if (triangles.Count == 0) return;
-
-        // Determine the number of submeshes
-        int subMeshCount = triangles[triangles.Count - 1].subMesh + 1;
-        mesh.subMeshCount = subMeshCount;
-
-        // Prepare triangle lists for each submesh
-        List<List<int>> submeshTriangles = new List<List<int>>(subMeshCount);
-        for (int i = 0; i < subMeshCount; i++)
-            submeshTriangles.Add(new List<int>());
-
-        // Populate submesh triangle lists
-        foreach (var tri in triangles)
-        {
-            submeshTriangles[tri.subMesh].Add(tri.p1);
-            submeshTriangles[tri.subMesh].Add(tri.p2);
-            submeshTriangles[tri.subMesh].Add(tri.p3);
-        }
-
-        // Assign triangles to the mesh
-        for (int i = 0; i < subMeshCount; i++)
-        {
-            mesh.SetTriangles(submeshTriangles[i], i);
-        }
-    }
-
-
-    Mesh GetMeshSlice(Mesh original, Vector3 planePoint, Vector3 planeNormal)
+    Mesh GetMeshSlice(Mesh original, Plane plane)
     {
         //values for first new mesh
         Dictionary<int, int> vectorDict = new();
-        List<Vector3> newVertices = new ();
-        List<Vector3> newNormals = new();
-        List<Vector2> newUVs = new();
+        List<Vertex> newVertices = new();
         List<Triangle> newTriangles = new();
 
         Dictionary<(int,int), int> cutPoints = new();
         List<(int,int)> cutEdges = new();
 
         //get mesh data
-        Vector3[] vertices = original.vertices;
-        Vector3[] normals = original.normals;
-        Vector2[] UVs = original.uv;
-        Triangle[] triangles = GetTriangles(original);
+        Vertex[] vertices = MeshUtility.GetVertices(original);
+        Triangle[] triangles = MeshUtility.GetTriangles(original);
         
-
         //add points to dict
         for (int i = 0; i < vertices.Length; i++)
         {
-            if (InSlice(vertices[i], planePoint, planeNormal))
+            if (VertexUtility.InSlice(vertices[i].position, plane))
             {
                 vectorDict.Add(i, newVertices.Count);
                 newVertices.Add(vertices[i]);
-                newNormals.Add(normals[i]);
-                newUVs.Add(UVs[i]);
             }
         }
 
@@ -321,10 +156,8 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p2], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p2], t));
-                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p2], t));
-                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p2], t));
+                        float t = VertexUtility.EdgePortion(vertices[tri.p1], vertices[tri.p2], plane);
+                        newVertices.Add(Vertex.Lerp(vertices[tri.p1], vertices[tri.p2], t));
 
                         cutPoints.Add((tri.p1, tri.p2), newPoint1);
                     }
@@ -340,10 +173,8 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p3], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p3], t));
-                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p3], t));
-                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p3], t));
+                        float t = VertexUtility.EdgePortion(vertices[tri.p1], vertices[tri.p3], plane);
+                        newVertices.Add(Vertex.Lerp(vertices[tri.p1], vertices[tri.p3], t));
 
                         cutPoints.Add((tri.p1, tri.p3), newPoint2);
                     }
@@ -366,10 +197,8 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p2], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p2], t));
-                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p2], t));
-                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p2], t));
+                        float t = VertexUtility.EdgePortion(vertices[tri.p1], vertices[tri.p2], plane);
+                        newVertices.Add(Vertex.Lerp(vertices[tri.p1], vertices[tri.p2], t));
 
                         cutPoints.Add((tri.p1, tri.p2), newPoint1);
                     }
@@ -385,10 +214,8 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = EdgePortion(vertices[tri.p1], vertices[tri.p3], planePoint, planeNormal);
-                        newVertices.Add(EdgeIntercept(vertices[tri.p1], vertices[tri.p3], t));
-                        newUVs.Add(EdgeUV(UVs[tri.p1], UVs[tri.p3], t));
-                        newNormals.Add(EdgeNormal(normals[tri.p1], normals[tri.p3], t));
+                        float t = VertexUtility.EdgePortion(vertices[tri.p1], vertices[tri.p3], plane);
+                        newVertices.Add(Vertex.Lerp(vertices[tri.p1], vertices[tri.p3], t));
 
                         cutPoints.Add((tri.p1, tri.p3), newPoint2);
                     }
@@ -420,14 +247,12 @@ public class Sliceable : MonoBehaviour
                 Vector3 centerPoint = Vector3.zero;
                 for (int i = 0; i < cutEdges.Count; ++i)
                 {
-                    centerPoint += newVertices[cutEdges[i].Item1] + newVertices[cutEdges[i].Item2];
+                    centerPoint += newVertices[cutEdges[i].Item1].position + newVertices[cutEdges[i].Item2].position;
                 }
                 centerPoint /= cutEdges.Count * 2;
 
                 int centerPointIndex = newVertices.Count;
-                newVertices.Add(centerPoint);
-                newNormals.Add(-planeNormal);
-                newUVs.Add(Vector2.zero);
+                newVertices.Add(new Vertex(centerPoint, -plane.normal, Vector2.zero));
 
                 //add new geometry into plane
                 for (int i = 0; i < cutEdges.Count; ++i)
@@ -436,13 +261,15 @@ public class Sliceable : MonoBehaviour
                     newTriangles.Add(new Triangle(newVertices.Count + 1, newVertices.Count, centerPointIndex, sliceSubmesh));
 
                     //new points
-                    newVertices.Add(newVertices[cutEdges[i].Item1]);
-                    newNormals.Add(-planeNormal);
-                    newUVs.Add(Vector2.zero);
+                    Vertex newVertex1 = newVertices[cutEdges[i].Item1];
+                    newVertex1.normal = -plane.normal;
+                    newVertex1.uv0 = Vector2.zero;
+                    newVertices.Add(newVertex1);
 
-                    newVertices.Add(newVertices[cutEdges[i].Item2]);
-                    newNormals.Add(-planeNormal);
-                    newUVs.Add(Vector2.zero);
+                    Vertex newVertex2 = newVertices[cutEdges[i].Item2];
+                    newVertex1.normal = -plane.normal;
+                    newVertex1.uv0 = Vector2.zero;
+                    newVertices.Add(newVertex2);
                 }
             }
         }
@@ -456,7 +283,7 @@ public class Sliceable : MonoBehaviour
                 bool foundClose = false;
                 for (int j=0; j<i; ++j)
                 {
-                    if (VectorsClose(newVertices[pointIndexes[i]], newVertices[pointIndexes[j]]))
+                    if (VertexUtility.VectorsClose(newVertices[pointIndexes[i]].position, newVertices[pointIndexes[j]].position))
                     {
                         closeIndexes[pointIndexes[i]] = pointIndexes[j];
                         foundClose = true;
@@ -486,7 +313,7 @@ public class Sliceable : MonoBehaviour
             List<List<int>> loops = ConnectionsToLoops(direct);
 
             //get 2d polygons from loops
-            List<Polygon> polygons = Polygon.MakePolygons(loops, newVertices, planeNormal, edgeUVMode==EdgeUVMode.Proj);
+            List<Polygon> polygons = Polygon.MakePolygons(loops, newVertices, plane.normal, edgeUVMode==EdgeUVMode.Proj);
 
             //divide polygons by direction 
             List<Polygon> polygonsCW = new();
@@ -535,19 +362,17 @@ public class Sliceable : MonoBehaviour
                 //add points
                 foreach (PolygonNode node in nodes)
                 {
-                    newVertices.Add(newVertices[node.index]);
-                    newUVs.Add(edgeUVMode==EdgeUVMode.Zero ? Vector2.zero : node.pos);
-                    newNormals.Add(-planeNormal);
+                    Vector2 newUV = edgeUVMode == EdgeUVMode.Zero ? Vector2.zero : node.pos;
+                    Vertex newVertex = new Vertex(newVertices[node.index].position, -plane.normal, newUV);
+                    newVertices.Add(newVertex);
                 }
             }
         }
 
         //create new mesh
         Mesh slice = new Mesh();
-        slice.SetVertices(newVertices);
-        slice.SetNormals(newNormals);
-        slice.SetUVs(0, newUVs);
-        AssignTrianglesToMesh(slice, newTriangles);
+        MeshUtility.AssignVerticesToMesh(slice, newVertices);
+        MeshUtility.AssignTrianglesToMesh(slice, newTriangles);
         slice.RecalculateBounds();
 
         return slice;
@@ -624,13 +449,15 @@ public class Sliceable : MonoBehaviour
         //normalize normal
         planeNormal.Normalize();
 
+        Plane plane = new Plane(planePoint, planeNormal);
+
         //check boudning box
         Mesh original = meshFilter.mesh;
-        if (!IntersectsBounds(original.bounds, planePoint, planeNormal)) return;
+        if (!MeshUtility.IntersectsBounds(original, plane)) return;
 
         //get new slices
-        Mesh slice1 = GetMeshSlice(original, planePoint, planeNormal);
-        Mesh slice2 = slice1==null? null : GetMeshSlice(original, planePoint, -planeNormal);
+        Mesh slice1 = GetMeshSlice(original, plane);
+        Mesh slice2 = slice1==null? null : GetMeshSlice(original, -plane);
 
         //check that object is split
         if (slice2)

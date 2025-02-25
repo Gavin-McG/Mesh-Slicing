@@ -66,7 +66,7 @@ public class Polygon
 
 
     //convert a 3d path into a 2d polygon
-    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vector3> vertices, Vector3 normal, bool clamp=false)
+    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vertex> vertices, Vector3 normal, bool clamp=false)
     {
         //Convert slice to 2D polygons and determine direction
         Vector3 dir1 = GetOrthogonalVector(normal);
@@ -78,7 +78,7 @@ public class Polygon
         }
 
         //clamp values between 0 and 1
-        if (clamp)
+        if (clamp && polygons.Count>0)
         {
             //find bounding box
             float minX = polygons[0].nodes[0].pos.x, maxX = polygons[0].nodes[0].pos.x;
@@ -113,13 +113,13 @@ public class Polygon
     }
 
 
-    public static Polygon MakePolygon(List<int> loop,  List<Vector3> vertices, Vector3 dir1, Vector3 dir2)
+    public static Polygon MakePolygon(List<int> loop,  List<Vertex> vertices, Vector3 dir1, Vector3 dir2)
     {
         //turn loops into 2d list
         List<Vector2> polygon = new List<Vector2>();
         foreach (int point in loop)
         {
-            Vector3 pos = vertices[point];
+            Vector3 pos = vertices[point].position;
             float comp1 = Vector3.Dot(dir1, pos);
             float comp2 = Vector3.Dot(dir2, pos);
             polygon.Add(new Vector2(comp2, comp1));

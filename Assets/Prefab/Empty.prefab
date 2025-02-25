@@ -11,9 +11,9 @@ GameObject:
   - component: {fileID: 3274343254877976036}
   - component: {fileID: 676693536727445086}
   - component: {fileID: 2108902002336450795}
-  - component: {fileID: 7182193146598005623}
-  - component: {fileID: 2531967063316886550}
   - component: {fileID: -3913771511257291098}
+  - component: {fileID: 3355889918103920146}
+  - component: {fileID: -1930767930278912190}
   m_Layer: 0
   m_Name: Empty
   m_TagString: Untagged
@@ -86,14 +86,33 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &7182193146598005623
+--- !u!114 &-3913771511257291098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7934931669055476929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27a7309377c7dd948a5c1e827f869837, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  meshFilter: {fileID: 676693536727445086}
+  emptyPrefab: {fileID: 676693536727445086}
+  edgeFillMode: 2
+  edgeUVMode: 1
+  momentumMode: 1
+  sliceMaterial: {fileID: 0}
+  hasSliceSubMesh: 1
+--- !u!64 &3355889918103920146
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7934931669055476929}
-  m_Material: {fileID: 13400000, guid: 927a6780ba822c24aa3a90d185b8adda, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -108,7 +127,7 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 0}
---- !u!54 &2531967063316886550
+--- !u!54 &-1930767930278912190
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -130,25 +149,8 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
+  m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &-3913771511257291098
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7934931669055476929}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 27a7309377c7dd948a5c1e827f869837, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  meshFilter: {fileID: 676693536727445086}
-  emptyPrefab: {fileID: 676693536727445086}
-  edgeFillMode: 1
-  momentumMode: 1
-  hasSliceSubMesh: 1

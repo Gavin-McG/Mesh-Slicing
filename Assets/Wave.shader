@@ -11,8 +11,6 @@ Shader "Custom/Wave"
 	SubShader
 	{
 		Tags { "RenderType" = "Opaque" }
-		CULL Off
-		ZWrite Off
 		Pass
 		{
 			Name "BasePass"
@@ -44,6 +42,8 @@ Shader "Custom/Wave"
 			Name "OutlinePass"
 			Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }
 			Blend SrcAlpha OneMinusSrcAlpha
+			CULL Off
+			ZWrite Off
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -88,6 +88,8 @@ Shader "Custom/Wave"
 			Name "OutlinePass"
 			Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }
 			Blend SrcAlpha OneMinusSrcAlpha
+			CULL Off
+			ZWrite Off
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag

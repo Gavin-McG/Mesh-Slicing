@@ -5,7 +5,6 @@ using UnityEngine.Events;
 
 public class Slicer : MonoBehaviour
 {
-    [SerializeField] int slices = 1;
     [SerializeField] bool makeSlice = false;
 
     public static UnityEvent<Vector3, Vector3> MakeSlice = new UnityEvent<Vector3, Vector3>();
