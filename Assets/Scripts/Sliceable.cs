@@ -428,7 +428,7 @@ public class Sliceable : MonoBehaviour
         {
             if (momentumMode == MomentumMode.Simple)
             {
-                newRigidBody.velocity = oldRigidBody.velocity;
+                newRigidBody.linearVelocity = oldRigidBody.linearVelocity;
                 newRigidBody.angularVelocity = oldRigidBody.angularVelocity;
             }
             else if (momentumMode == MomentumMode.Advanced)
