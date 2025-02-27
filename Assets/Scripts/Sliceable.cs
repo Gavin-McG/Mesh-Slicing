@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.ProBuilder.MeshOperations;
-using UnityEngine.Rendering;
 
 [System.Serializable] enum EdgeFillMode { None, Center, Triangulate }
 [System.Serializable] enum EdgeUVMode { Zero, Proj }
@@ -15,6 +15,8 @@ public class Sliceable : MonoBehaviour
     [SerializeField] MeshFilter meshFilter;
     [SerializeField] MeshFilter emptyPrefab;
     [Space(10)]
+    [SerializeField] public VertexType vertexType;
+    [Space(10)]
     [SerializeField] EdgeFillMode edgeFillMode = EdgeFillMode.Center;
     [SerializeField] EdgeUVMode edgeUVMode = EdgeUVMode.Proj;
     [SerializeField] MomentumMode momentumMode = MomentumMode.Simple;
@@ -22,11 +24,42 @@ public class Sliceable : MonoBehaviour
     [SerializeField] Material sliceMaterial;
     [SerializeField] bool hasSliceSubMesh = false;
 
+    UnityAction<Vector3, Vector3> sliceAction = null;
+
     private void Awake()
     {
         meshFilter = GetComponent<MeshFilter>();
+    }
 
-        Slicer.MakeSlice.AddListener(Slice);
+    private void OnEnable()
+    {
+        ChangeListener();
+    }
+
+    private void OnDisable()
+    {
+        if (sliceAction != null) Slicer.MakeSlice.AddListener(sliceAction);
+    }
+
+
+
+
+    UnityAction<Vector3, Vector3> GetSliceAction()
+    {
+        Debug.Log(vertexType.name.ToString());
+        return vertexType.name switch
+        {
+            "VertexStandardRig" => Slice<VertexStandardRig>,
+            "VertexBasic" => Slice<VertexBasic>,
+            _ => throw new Exception("Vertex Type not specified")
+        };
+    }
+
+    void ChangeListener()
+    {
+        if (enabled && sliceAction != null) Slicer.MakeSlice.RemoveListener(sliceAction);
+        sliceAction = GetSliceAction();
+        if (enabled && sliceAction != null) Slicer.MakeSlice.AddListener(sliceAction);
     }
 
     List<List<int>> ConnectionsToLoops(Dictionary<int, int> direct)
@@ -437,10 +470,17 @@ public class Sliceable : MonoBehaviour
             }
         }
 
+        //copy mesh type
+        Sliceable sliceable = newFilter.GetComponent<Sliceable>();
+        if (sliceable != null)
+        {
+            sliceable.vertexType.name = vertexType.name;
+        }
+
         return newFilter.gameObject;
     }
 
-    void Slice(Vector3 planePoint, Vector3 planeNormal)
+    void Slice<T>(Vector3 planePoint, Vector3 planeNormal) where T : struct, IVertex<T>
     {
         //convert from world to local space
         planePoint = transform.InverseTransformPoint(planePoint);
@@ -456,8 +496,8 @@ public class Sliceable : MonoBehaviour
         if (!MeshUtility.IntersectsBounds(original, plane)) return;
 
         //get new slices
-        Mesh slice1 = GetMeshSlice<VertexFull>(original, plane);
-        Mesh slice2 = slice1==null? null : GetMeshSlice<VertexFull>(original, -plane);
+        Mesh slice1 = GetMeshSlice<T>(original, plane);
+        Mesh slice2 = slice1==null? null : GetMeshSlice<T>(original, -plane);
 
         //check that object is split
         if (slice2)
@@ -468,7 +508,7 @@ public class Sliceable : MonoBehaviour
 
             //destroy original object
             Destroy(gameObject);
-            Slicer.MakeSlice.RemoveListener(Slice);
+            Slicer.MakeSlice.RemoveListener(Slice<T>);
         }
     }
 }

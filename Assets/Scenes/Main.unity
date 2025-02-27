@@ -617,6 +617,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   meshFilter: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
   emptyPrefab: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
+  vertexType:
+    name: VertexBasic
   edgeFillMode: 2
   edgeUVMode: 1
   momentumMode: 1
