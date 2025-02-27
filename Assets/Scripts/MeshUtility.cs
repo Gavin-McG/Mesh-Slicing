@@ -1,10 +1,12 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public static class MeshUtility
+public static partial class MeshUtility
 {
 
 
@@ -45,39 +47,15 @@ public static class MeshUtility
         return (s != 0 && s != boundsCorners.Count);
     }
 
-
-    public static Vertex[] GetVertices(Mesh mesh)
+    public static void GetVertices<T>(Mesh mesh, out NativeArray<T> vertexData) where T : struct, IVertex<T>
     {
-        Vector3[] positions = mesh.vertices;
-        Vector3[] normals = mesh.normals;
-        Vector4[] tangents = mesh.tangents;
-        Color[] colors = mesh.colors;
-        Vector2[] uv0 = mesh.uv;
-
-        Vertex[] vertices = new Vertex[positions.Length];
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            vertices[i] = new Vertex(
-                positions[i],
-                normals[i],
-                uv0[i]
-            );
-        }
-
-        //allow meshe without tangents/colors
-        for (int i = 0; i < tangents.Length; ++i)
-        {
-            vertices[i].tangent = tangents[i];
-        }
-        for (int i = 0; i<colors.Length; ++i)
-        {
-            vertices[i].color = colors[i];
-        }
-
-
-        return vertices;
+        throw new NotImplementedException("");
     }
 
+    public static Mesh SetMeshVertices<T>(List<T> vertices) where T : struct, IVertex<T>
+    {
+        throw new NotImplementedException("");
+    }
 
     public static Triangle[] GetTriangles(Mesh mesh)
     {
@@ -98,34 +76,6 @@ public static class MeshUtility
         }
 
         return triangles;
-    }
-
-
-    public static void AssignVerticesToMesh(Mesh mesh, List<Vertex> vertices)
-    {
-        int count = vertices.Count;
-
-        List<Vector3> positions = new List<Vector3>(count);
-        List<Vector3> normals = new List<Vector3>(count);
-        List<Vector4> tangents = new List<Vector4>(count);
-        List<Color> colors = new List<Color>(count);
-        List<Vector2> uvs = new List<Vector2>(count);
-
-        foreach (var vertex in vertices)
-        {
-            positions.Add(vertex.position);
-            normals.Add(vertex.normal);
-            tangents.Add(vertex.tangent);
-            colors.Add(vertex.color);
-            uvs.Add(vertex.uv0);
-        }
-
-        mesh.Clear();
-        mesh.SetVertices(positions);
-        mesh.SetNormals(normals);
-        mesh.SetTangents(tangents);
-        mesh.SetColors(colors);
-        mesh.SetUVs(0, uvs);
     }
 
 

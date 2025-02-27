@@ -66,7 +66,7 @@ public class Polygon
 
 
     //convert a 3d path into a 2d polygon
-    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vertex> vertices, Vector3 normal, bool clamp=false)
+    public static List<Polygon> MakePolygons<T>(List<List<int>> loops, List<T> vertices, Vector3 normal, bool clamp=false) where T : struct, IVertex<T>
     {
         //Convert slice to 2D polygons and determine direction
         Vector3 dir1 = GetOrthogonalVector(normal);
@@ -113,7 +113,7 @@ public class Polygon
     }
 
 
-    public static Polygon MakePolygon(List<int> loop,  List<Vertex> vertices, Vector3 dir1, Vector3 dir2)
+    public static Polygon MakePolygon<T>(List<int> loop,  List<T> vertices, Vector3 dir1, Vector3 dir2) where T : struct, IVertex<T>
     {
         //turn loops into 2d list
         List<Vector2> polygon = new List<Vector2>();
