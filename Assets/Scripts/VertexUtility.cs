@@ -16,9 +16,11 @@ public static class VertexUtility
     }
 
 
-    public static float EdgePortion<T>(T vertex1, T vertex2, Plane plane) where T : struct, IVertex<T>
+    public static float EdgePortion<T, U>(T vertex1, T vertex2, Plane plane)
+        where T : struct, IVertex<T, U>
+        where U : struct, ITexCoord<U>
     {
-        return EdgePortion(vertex1.position, vertex2.position, plane);
+        return EdgePortion(vertex1.Position, vertex2.Position, plane);
     }
 
     public static float EdgePortion(Vector3 point1, Vector3 point2, Plane plane)

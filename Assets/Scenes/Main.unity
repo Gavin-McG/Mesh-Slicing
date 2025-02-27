@@ -510,7 +510,7 @@ Transform:
   m_GameObject: {fileID: 1299085335}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 7.45, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -533,7 +533,7 @@ Transform:
   m_GameObject: {fileID: 3073954724326478471}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -0, y: 4.28, z: 0}
+  m_LocalPosition: {x: -0, y: 7.82, z: 0}
   m_LocalScale: {x: 5, y: 5, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -618,11 +618,11 @@ MonoBehaviour:
   meshFilter: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
   emptyPrefab: {fileID: 676693536727445086, guid: 39a4ad519fd86ab469ba36a7482c6d06, type: 3}
   vertexType:
-    name: VertexBasic
+    name: VertexStandardRig
   edgeFillMode: 2
   edgeUVMode: 1
   momentumMode: 1
-  sliceMaterial: {fileID: 2100000, guid: 3bbda6b41551d0545925867a9ca11dab, type: 2}
+  sliceMaterial: {fileID: 2100000, guid: a0edbf9025734a04d917d816da9371cd, type: 2}
   hasSliceSubMesh: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

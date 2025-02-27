@@ -3,7 +3,6 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 [CustomPropertyDrawer(typeof(VertexType))]
 public class VertexTypeDrawer : PropertyDrawer
