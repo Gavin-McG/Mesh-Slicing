@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 using UnityEngine;
 
 
-using TexCoord = TexCoord1;
+using TexCoord = TexCoord8;
 using Vertex = VertexFull;
 
 
@@ -123,6 +123,13 @@ public struct VertexFull :
 
             new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, dimension:4, stream:1),
             new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord2, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord3, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord4, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord5, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord6, VertexAttributeFormat.Float32, dimension:2, stream:1),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord7, VertexAttributeFormat.Float32, dimension:2, stream:1),
 
             new VertexAttributeDescriptor(VertexAttribute.BlendWeight, VertexAttributeFormat.Float32, dimension:4, stream:2),
             new VertexAttributeDescriptor(VertexAttribute.BlendIndices, VertexAttributeFormat.UInt32, dimension:4, stream:2),

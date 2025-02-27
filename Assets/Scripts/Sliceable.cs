@@ -57,7 +57,7 @@ public class Sliceable : MonoBehaviour
             "VertexTangent" => Slice<VertexTangent, TexCoord1>,
             "VertexPrimative" => Slice<VertexPrimative, TexCoord2>,
             "VertexStandardRig" => Slice<VertexStandardRig, TexCoord1>,
-            "VertexFull" => Slice<VertexFull, TexCoord1>,
+            "VertexFull" => Slice<VertexFull, TexCoord8>,
             _ => throw new Exception("Vertex Type not specified")
         };
     }
