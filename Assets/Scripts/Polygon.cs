@@ -66,7 +66,9 @@ public class Polygon
 
 
     //convert a 3d path into a 2d polygon
-    public static List<Polygon> MakePolygons(List<List<int>> loops, List<Vertex> vertices, Vector3 normal, bool clamp=false)
+    public static List<Polygon> MakePolygons<T, U>(List<List<int>> loops, List<T> vertices, Vector3 normal, bool clamp=false) 
+        where T : struct, IVertex<T, U>
+        where U : struct, ITexCoord<U>
     {
         //Convert slice to 2D polygons and determine direction
         Vector3 dir1 = GetOrthogonalVector(normal);
@@ -74,7 +76,7 @@ public class Polygon
         List<Polygon> polygons = new();
         foreach (List<int> loop in loops)
         {
-            polygons.Add(MakePolygon(loop, vertices, dir1, dir2));
+            polygons.Add(MakePolygon<T, U>(loop, vertices, dir1, dir2));
         }
 
         //clamp values between 0 and 1
@@ -113,13 +115,15 @@ public class Polygon
     }
 
 
-    public static Polygon MakePolygon(List<int> loop,  List<Vertex> vertices, Vector3 dir1, Vector3 dir2)
+    public static Polygon MakePolygon<T, U>(List<int> loop,  List<T> vertices, Vector3 dir1, Vector3 dir2)
+        where T : struct, IVertex<T, U>
+        where U : struct, ITexCoord<U>
     {
         //turn loops into 2d list
         List<Vector2> polygon = new List<Vector2>();
         foreach (int point in loop)
         {
-            Vector3 pos = vertices[point].position;
+            Vector3 pos = vertices[point].Position;
             float comp1 = Vector3.Dot(dir1, pos);
             float comp2 = Vector3.Dot(dir2, pos);
             polygon.Add(new Vector2(comp2, comp1));
