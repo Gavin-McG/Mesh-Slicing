@@ -47,16 +47,6 @@ public static partial class MeshUtility
         return (s != 0 && s != boundsCorners.Count);
     }
 
-    public static void GetVertices<T>(Mesh mesh, out NativeArray<T> vertexData) where T : struct, IVertex<T>
-    {
-        throw new NotImplementedException("");
-    }
-
-    public static Mesh SetMeshVertices<T>(List<T> vertices) where T : struct, IVertex<T>
-    {
-        throw new NotImplementedException("");
-    }
-
     public static Triangle[] GetTriangles(Mesh mesh)
     {
         int[] indices = mesh.triangles;

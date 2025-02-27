@@ -69,8 +69,7 @@ public class Sliceable : MonoBehaviour
         List<(int,int)> cutEdges = new();
 
         //get mesh data
-        NativeArray<T> vertices;
-        MeshUtility.GetVertices(original, out vertices);
+        NativeArray<T> vertices = new T().GetVertices(original);
         Triangle[] triangles = MeshUtility.GetTriangles(original);
         
         //add points to dict
@@ -253,8 +252,7 @@ public class Sliceable : MonoBehaviour
                 centerPoint /= cutEdges.Count * 2;
 
                 int centerPointIndex = newVertices.Count;
-                T newVertex = new T();
-                newVertex.Initialize(centerPoint, -plane.normal, Vector2.zero);
+                T newVertex = new T().Initialize(centerPoint, -plane.normal, Vector2.zero);
                 newVertices.Add(newVertex);
 
                 //add new geometry into plane
@@ -366,15 +364,14 @@ public class Sliceable : MonoBehaviour
                 foreach (PolygonNode node in nodes)
                 {
                     Vector2 newUV = edgeUVMode == EdgeUVMode.Zero ? Vector2.zero : node.pos;
-                    T newVertex = new T();
-                    newVertex.Initialize(newVertices[node.index].position, -plane.normal, newUV);
+                    T newVertex = new T().Initialize(newVertices[node.index].position, -plane.normal, newUV);
                     newVertices.Add(newVertex);
                 }
             }
         }
 
         //create new mesh
-        Mesh slice = MeshUtility.SetMeshVertices(newVertices);
+        Mesh slice = new T().SetMeshVertices(newVertices);
         MeshUtility.AssignTrianglesToMesh(slice, newTriangles);
         slice.RecalculateBounds();
 
