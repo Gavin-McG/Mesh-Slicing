@@ -2,8 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Experimental.AI;
-
+using MeshSlicing.Vertex;
 
 public struct PolygonNode
 {

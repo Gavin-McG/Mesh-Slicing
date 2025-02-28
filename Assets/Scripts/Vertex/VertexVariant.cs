@@ -1,7 +1,10 @@
 using System;
 
-[AttributeUsage(AttributeTargets.Struct, Inherited = false)]
-public class VertexVariant : Attribute
+namespace MeshSlicing.Vertex
 {
+    [AttributeUsage(AttributeTargets.Struct, Inherited = false)]
+    public class VertexVariant : Attribute
+    {
 
+    }
 }

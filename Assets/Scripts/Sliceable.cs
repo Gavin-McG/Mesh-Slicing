@@ -5,6 +5,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.ProBuilder.MeshOperations;
+using MeshSlicing.Vertex;
 
 [System.Serializable] enum EdgeFillMode { None, Center, Triangulate }
 [System.Serializable] enum EdgeUVMode { Zero, Proj }
