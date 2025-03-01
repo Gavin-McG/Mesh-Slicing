@@ -118,7 +118,7 @@ public class Sliceable : MonoBehaviour
         //add points to dict
         for (int i = 0; i < vertices.Length; i++)
         {
-            if (VertexUtility.InSlice(vertices[i].Position, plane))
+            if (MeshUtility.InSlice(vertices[i].Position, plane))
             {
                 vectorDict.Add(i, newVertices.Count);
                 newVertices.Add(vertices[i]);
@@ -199,7 +199,7 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = VertexUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p2], plane);
+                        float t = MeshUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p2], plane);
                         newVertices.Add(vertices[tri.p1].Lerp(vertices[tri.p2], t));
 
                         cutPoints.Add((tri.p1, tri.p2), newPoint1);
@@ -216,7 +216,7 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = VertexUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p3], plane);
+                        float t = MeshUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p3], plane);
                         newVertices.Add(vertices[tri.p1].Lerp(vertices[tri.p3], t));
 
                         cutPoints.Add((tri.p1, tri.p3), newPoint2);
@@ -240,7 +240,7 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint1 = newVertices.Count;
 
-                        float t = VertexUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p2], plane);
+                        float t = MeshUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p2], plane);
                         newVertices.Add(vertices[tri.p1].Lerp(vertices[tri.p2], t));
 
                         cutPoints.Add((tri.p1, tri.p2), newPoint1);
@@ -257,7 +257,7 @@ public class Sliceable : MonoBehaviour
                         //create new point
                         newPoint2 = newVertices.Count;
 
-                        float t = VertexUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p3], plane);
+                        float t = MeshUtility.EdgePortion<T, U>(vertices[tri.p1], vertices[tri.p3], plane);
                         newVertices.Add(vertices[tri.p1].Lerp(vertices[tri.p3], t));
 
                         cutPoints.Add((tri.p1, tri.p3), newPoint2);
@@ -332,7 +332,7 @@ public class Sliceable : MonoBehaviour
                 bool foundClose = false;
                 for (int j=0; j<i; ++j)
                 {
-                    if (VertexUtility.VectorsClose(newVertices[pointIndexes[i]].Position, newVertices[pointIndexes[j]].Position))
+                    if (MeshUtility.VectorsClose(newVertices[pointIndexes[i]].Position, newVertices[pointIndexes[j]].Position))
                     {
                         closeIndexes[pointIndexes[i]] = pointIndexes[j];
                         foundClose = true;
